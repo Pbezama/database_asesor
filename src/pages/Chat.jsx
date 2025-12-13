@@ -23,6 +23,8 @@ const Chat = () => {
   const [accionPendiente, setAccionPendiente] = useState(null)
   const [mostrarEditor, setMostrarEditor] = useState(true)
   const [modoChatIA, setModoChatIA] = useState(false)
+  // Estado para navegacion movil: 'chat' | 'editor' | 'chatia'
+  const [vistaMobile, setVistaMobile] = useState('chat')
 
   const { usuario, logout, sesionChatId, mensajesCount, incrementarMensajes, reiniciarChat, esSuperAdmin } = useAuth()
   const navigate = useNavigate()
@@ -93,6 +95,26 @@ const Chat = () => {
     } else {
       // Volviendo a modo controlador
       agregarMensajeBienvenida()
+    }
+  }
+
+  // Funcion para cambiar vista en movil
+  const cambiarVistaMobile = (vista) => {
+    setVistaMobile(vista)
+    if (vista === 'chatia') {
+      if (!modoChatIA) {
+        setModoChatIA(true)
+        setMensajes([])
+        setAccionPendiente(null)
+        agregarMensajeBienvenidaChatIA()
+      }
+    } else if (vista === 'chat' || vista === 'editor') {
+      if (modoChatIA) {
+        setModoChatIA(false)
+        setMensajes([])
+        setAccionPendiente(null)
+        agregarMensajeBienvenida()
+      }
     }
   }
 
@@ -486,7 +508,7 @@ const Chat = () => {
         <div className="header-left">
           <span className="header-logo">◈</span>
           <div className="header-info">
-            <h1>Admin Panel</h1>
+            <h1>Admin Panel - Your Friend</h1>
             <span className="header-marca">{usuario.nombre_marca}</span>
           </div>
         </div>
@@ -501,7 +523,7 @@ const Chat = () => {
           {!modoChatIA && (
             <button
               onClick={() => setMostrarEditor(!mostrarEditor)}
-              className={`btn-icon btn-toggle-editor ${mostrarEditor ? 'active' : ''}`}
+              className={`btn-icon btn-toggle-editor desktop-only ${mostrarEditor ? 'active' : ''}`}
               title={mostrarEditor ? 'Ocultar editor' : 'Mostrar editor'}
             >
               ≡
@@ -510,7 +532,7 @@ const Chat = () => {
           <button onClick={handleReiniciarChat} className="btn-icon" title="Reiniciar chat">
             ↻
           </button>
-          <button onClick={handleLogout} className="btn-icon btn-logout" title="Cerrar sesión">
+          <button onClick={handleLogout} className="btn-icon btn-logout" title="Cerrar sesion">
             ⏻
           </button>
         </div>
@@ -519,12 +541,12 @@ const Chat = () => {
       {/* Layout principal dividido */}
       <div className="main-layout">
         {/* Panel izquierdo: Chat */}
-        <div className={`chat-panel ${!mostrarEditor ? 'full-width' : ''}`}>
-          {/* Indicador de acción pendiente (solo en modo controlador) */}
+        <div className={`chat-panel ${!mostrarEditor ? 'full-width' : ''} mobile-panel ${vistaMobile === 'chat' || vistaMobile === 'chatia' ? 'mobile-visible' : 'mobile-hidden'}`}>
+          {/* Indicador de accion pendiente (solo en modo controlador) */}
           {!modoChatIA && accionPendiente && (
             <div className="accion-pendiente-indicator">
               <span>●</span>
-              <span>Acción pendiente: <strong>{accionPendiente.accion}</strong></span>
+              <span>Accion pendiente: <strong>{accionPendiente.accion}</strong></span>
               <span className="accion-id">
                 {accionPendiente.accion === 'modificar' && accionPendiente.parametros?.id_fila &&
                   `(ID: ${accionPendiente.parametros.id_fila})`
@@ -562,7 +584,7 @@ const Chat = () => {
           {/* Input */}
           <footer className="chat-input-container">
             <div className="mensajes-restantes">
-              {20 - mensajesCount} mensajes restantes en esta sesión
+              {20 - mensajesCount} mensajes restantes
             </div>
             <form onSubmit={handleEnviarMensaje} className="chat-input-form">
               <textarea
@@ -570,7 +592,7 @@ const Chat = () => {
                 value={inputMensaje}
                 onChange={(e) => setInputMensaje(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Escribe tu mensaje... (Enter para enviar)"
+                placeholder="Escribe tu mensaje..."
                 disabled={enviando || mensajesCount >= 20}
                 rows={1}
               />
@@ -587,7 +609,7 @@ const Chat = () => {
 
         {/* Panel derecho: Editor Manual (solo en modo controlador) */}
         {!modoChatIA && mostrarEditor && (
-          <div className="editor-panel">
+          <div className={`editor-panel mobile-panel ${vistaMobile === 'editor' ? 'mobile-visible' : 'mobile-hidden'}`}>
             <EditorManual
               usuario={usuario}
               esSuperAdmin={esSuperAdmin}
@@ -596,9 +618,20 @@ const Chat = () => {
           </div>
         )}
 
-        {/* Botón flotante para alternar entre modos */}
+        {/* Editor para movil cuando esta en vista editor pero modoChatIA esta activo */}
+        {vistaMobile === 'editor' && modoChatIA && (
+          <div className="editor-panel mobile-panel mobile-visible mobile-only">
+            <EditorManual
+              usuario={usuario}
+              esSuperAdmin={esSuperAdmin}
+              onDatosActualizados={cargarDatosMarca}
+            />
+          </div>
+        )}
+
+        {/* Boton flotante para alternar entre modos - SOLO DESKTOP */}
         <button
-          className={`btn-flotante-modo ${modoChatIA ? 'modo-controlador' : 'modo-chatia'}`}
+          className={`btn-flotante-modo desktop-only ${modoChatIA ? 'modo-controlador' : 'modo-chatia'}`}
           onClick={toggleModoChatIA}
         >
           <span className="btn-flotante-icon">{modoChatIA ? '◀' : '◆'}</span>
@@ -607,6 +640,31 @@ const Chat = () => {
           </span>
         </button>
       </div>
+
+      {/* Barra de navegacion inferior - SOLO MOVIL */}
+      <nav className="mobile-nav">
+        <button
+          className={`mobile-nav-btn ${vistaMobile === 'chat' ? 'active' : ''}`}
+          onClick={() => cambiarVistaMobile('chat')}
+        >
+          <span className="mobile-nav-icon">◈</span>
+          <span className="mobile-nav-label">Chat BD</span>
+        </button>
+        <button
+          className={`mobile-nav-btn ${vistaMobile === 'editor' ? 'active' : ''}`}
+          onClick={() => cambiarVistaMobile('editor')}
+        >
+          <span className="mobile-nav-icon">≡</span>
+          <span className="mobile-nav-label">Editor</span>
+        </button>
+        <button
+          className={`mobile-nav-btn ${vistaMobile === 'chatia' ? 'active' : ''}`}
+          onClick={() => cambiarVistaMobile('chatia')}
+        >
+          <span className="mobile-nav-icon">◆</span>
+          <span className="mobile-nav-label">Chat IA</span>
+        </button>
+      </nav>
     </div>
   )
 }

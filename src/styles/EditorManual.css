@@ -484,3 +484,212 @@
     grid-column: 1;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   ESTILOS MOVIL
+   ═══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .editor-manual {
+    border-left: none;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Header movil */
+  .editor-header {
+    padding: 12px 14px;
+    flex-shrink: 0;
+  }
+
+  .editor-header h2 {
+    font-size: 15px;
+  }
+
+  .btn-agregar {
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+
+  /* Mensaje feedback movil */
+  .editor-mensaje {
+    padding: 10px 14px;
+    font-size: 12px;
+  }
+
+  /* Formulario nuevo movil */
+  .form-nuevo {
+    padding: 12px 14px;
+    max-height: 50vh;
+    overflow-y: auto;
+  }
+
+  .form-nuevo h3 {
+    font-size: 13px;
+    margin-bottom: 12px;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .form-group-full {
+    grid-column: 1;
+  }
+
+  .form-group label {
+    font-size: 11px;
+  }
+
+  .form-group input,
+  .form-group select,
+  .form-group textarea {
+    padding: 10px 12px;
+    font-size: 14px;
+    border-radius: 8px;
+  }
+
+  .form-group textarea {
+    min-height: 50px;
+  }
+
+  .form-actions {
+    margin-top: 12px;
+    gap: 8px;
+  }
+
+  .btn-cancelar,
+  .btn-guardar {
+    padding: 10px 16px;
+    font-size: 13px;
+  }
+
+  /* Filtros movil */
+  .editor-filtros {
+    padding: 10px 14px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .filtro-busqueda {
+    flex: 1 1 100%;
+    order: 1;
+  }
+
+  .filtro-busqueda input {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .filtro-categoria {
+    flex: 1;
+    order: 2;
+  }
+
+  .filtro-categoria select {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 13px;
+  }
+
+  .btn-refresh {
+    order: 3;
+    width: 40px;
+    height: 40px;
+  }
+
+  /* Lista de datos movil */
+  .editor-lista {
+    flex: 1;
+    padding: 10px 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Cards movil */
+  .editor-card {
+    margin-bottom: 8px;
+    border-radius: 10px;
+  }
+
+  .card-header {
+    padding: 8px 12px;
+  }
+
+  .card-categoria {
+    padding: 3px 8px;
+    font-size: 10px;
+  }
+
+  .card-id {
+    font-size: 10px;
+  }
+
+  .card-body {
+    padding: 10px 12px;
+  }
+
+  .card-clave {
+    font-size: 13px;
+    margin-bottom: 4px;
+  }
+
+  .card-valor {
+    font-size: 12px;
+    max-height: 60px;
+    line-height: 1.4;
+  }
+
+  .card-meta {
+    padding: 6px 12px;
+    gap: 6px;
+  }
+
+  .meta-prioridad {
+    padding: 2px 6px;
+    font-size: 10px;
+  }
+
+  .meta-fecha {
+    font-size: 10px;
+  }
+
+  .card-actions {
+    padding: 8px 12px;
+    gap: 8px;
+  }
+
+  .btn-editar,
+  .btn-desactivar {
+    width: 36px;
+    height: 36px;
+    font-size: 14px;
+  }
+
+  /* Card en edicion movil */
+  .card-edicion {
+    padding: 12px;
+  }
+
+  .card-edicion .form-grid {
+    gap: 8px;
+  }
+
+  .card-edicion .form-group input,
+  .card-edicion .form-group select,
+  .card-edicion .form-group textarea {
+    padding: 10px 12px;
+    font-size: 14px;
+  }
+
+  .card-edicion .form-actions {
+    margin-top: 10px;
+  }
+
+  /* Footer movil */
+  .editor-footer {
+    padding: 8px 14px;
+    font-size: 11px;
+  }
+}
