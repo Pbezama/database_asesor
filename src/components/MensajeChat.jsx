@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import '../styles/MensajeChat.css'
 
-const MensajeChat = ({ mensaje, onConfirmar, onCancelar }) => {
-  const { rol, contenido, tipo, datos, tabla_preview, resumen } = mensaje
+const MensajeChat = ({ mensaje, onConfirmar, onCancelar, modoChatIA, onToggleModo, onRespuestaRapida }) => {
+  const { rol, contenido, tipo, datos, tabla_preview, resumen, mostrarBotonModo } = mensaje
   const esUsuario = rol === 'user'
+  const [respondido, setRespondido] = useState(false)
 
   // ═══════════════════════════════════════════════════════════════
   // RENDERIZAR TABLA
@@ -47,20 +48,45 @@ const MensajeChat = ({ mensaje, onConfirmar, onCancelar }) => {
   // RENDERIZAR CONFIRMACIÓN
   // ═══════════════════════════════════════════════════════════════
 
+  const handleRespuestaRapida = (respuesta) => {
+    if (respondido) return
+    setRespondido(true)
+    if (onRespuestaRapida) {
+      onRespuestaRapida(respuesta)
+    }
+  }
+
   const renderizarConfirmacion = () => {
     return (
       <div className="confirmacion-container">
         <div className="confirmacion-header">
-          <span className="confirmacion-icon">⚡</span>
+          <span className="confirmacion-icon">●</span>
           <span>Acción pendiente de confirmación</span>
         </div>
-        
-        {tabla_preview && renderizarTabla(tabla_preview, '📋 Vista previa de los cambios')}
-        
+
+        {tabla_preview && renderizarTabla(tabla_preview, 'Vista previa de los cambios')}
+
         <div className="confirmacion-acciones">
-          <span className="confirmacion-hint">
-            Responde <strong>"sí"</strong> para confirmar o <strong>"no"</strong> para cancelar
-          </span>
+          {!respondido ? (
+            <div className="confirmacion-botones">
+              <button
+                className="btn-confirmar btn-si"
+                onClick={() => handleRespuestaRapida('sí')}
+              >
+                Confirmar
+              </button>
+              <button
+                className="btn-confirmar btn-no"
+                onClick={() => handleRespuestaRapida('no')}
+              >
+                Cancelar
+              </button>
+            </div>
+          ) : (
+            <span className="confirmacion-respondido">
+              Respuesta enviada
+            </span>
+          )}
         </div>
       </div>
     )
@@ -97,7 +123,7 @@ const MensajeChat = ({ mensaje, onConfirmar, onCancelar }) => {
       case 'exito':
         return (
           <div className="mensaje-exito">
-            <span className="exito-icon">✅</span>
+            <span className="exito-icon">✓</span>
             <div className="exito-texto">{contenido}</div>
           </div>
         )
@@ -105,7 +131,7 @@ const MensajeChat = ({ mensaje, onConfirmar, onCancelar }) => {
       case 'error':
         return (
           <div className="mensaje-error">
-            <span className="error-icon">❌</span>
+            <span className="error-icon">✕</span>
             <div className="error-texto">{contenido}</div>
           </div>
         )
@@ -113,7 +139,7 @@ const MensajeChat = ({ mensaje, onConfirmar, onCancelar }) => {
       case 'accion_confirmada':
         return (
           <div className="mensaje-procesando">
-            <span className="procesando-icon">⏳</span>
+            <span className="procesando-icon">◌</span>
             <div className="procesando-texto">{contenido}</div>
           </div>
         )
@@ -121,7 +147,9 @@ const MensajeChat = ({ mensaje, onConfirmar, onCancelar }) => {
       case 'texto':
       default:
         // Procesar markdown básico para el texto
-        return <div className="mensaje-texto">{procesarTexto(contenido)}</div>
+        return (
+          <div className="mensaje-texto">{procesarTexto(contenido)}</div>
+        )
     }
   }
 
@@ -161,14 +189,14 @@ const MensajeChat = ({ mensaje, onConfirmar, onCancelar }) => {
   return (
     <div className={`mensaje ${esUsuario ? 'mensaje-usuario' : 'mensaje-asistente'} ${tipo ? `mensaje-tipo-${tipo}` : ''}`}>
       <div className="mensaje-avatar">
-        {esUsuario ? '👤' : '🤖'}
+        {esUsuario ? '◯' : '◈'}
       </div>
       <div className="mensaje-contenido">
         {renderizarContenido()}
         <div className="mensaje-timestamp">
-          {new Date(mensaje.timestamp).toLocaleTimeString('es-CL', { 
-            hour: '2-digit', 
-            minute: '2-digit' 
+          {new Date(mensaje.timestamp).toLocaleTimeString('es-CL', {
+            hour: '2-digit',
+            minute: '2-digit'
           })}
         </div>
       </div>

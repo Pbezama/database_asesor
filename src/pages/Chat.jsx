@@ -1,17 +1,18 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { 
-  obtenerDatosMarca, 
-  obtenerTodasLasMarcas, 
-  guardarMensajeChat, 
-  guardarLogAccion, 
-  agregarDato, 
-  modificarDato, 
-  desactivarDato 
+import {
+  obtenerDatosMarca,
+  obtenerTodasLasMarcas,
+  guardarMensajeChat,
+  guardarLogAccion,
+  agregarDato,
+  modificarDato,
+  desactivarDato
 } from '../services/supabase'
-import { procesarMensajeIA } from '../services/openai'
+import { procesarMensajeIA, chatDirectoIA } from '../services/openai'
 import MensajeChat from '../components/MensajeChat'
+import EditorManual from '../components/EditorManual'
 import '../styles/Chat.css'
 
 const Chat = () => {
@@ -20,7 +21,9 @@ const Chat = () => {
   const [enviando, setEnviando] = useState(false)
   const [datosMarca, setDatosMarca] = useState([])
   const [accionPendiente, setAccionPendiente] = useState(null)
-  
+  const [mostrarEditor, setMostrarEditor] = useState(true)
+  const [modoChatIA, setModoChatIA] = useState(false)
+
   const { usuario, logout, sesionChatId, mensajesCount, incrementarMensajes, reiniciarChat, esSuperAdmin } = useAuth()
   const navigate = useNavigate()
   const chatEndRef = useRef(null)
@@ -61,11 +64,36 @@ const Chat = () => {
 
     const mensajeBienvenida = {
       rol: 'assistant',
-      contenido: `¡${saludo}, ${usuario.nombre}! 👋\n\nSoy tu asistente para administrar los datos de **${usuario.nombre_marca}**.\n\nPuedes hablarme en lenguaje natural, por ejemplo:\n\n• "Muéstrame toda mi información"\n• "Quiero agregar una promoción de 20% de descuento hasta fin de mes"\n• "Desactiva la promoción del día de la madre"\n• "Agrega una regla: no se permiten mascotas sin correa"`,
+      contenido: `${saludo}, ${usuario.nombre}.\n\nSoy tu asistente para administrar los datos de **${usuario.nombre_marca}**.\n\nPuedes hablarme en lenguaje natural, por ejemplo:\n\n• "Muéstrame toda mi información"\n• "Quiero agregar una promoción de 20% de descuento hasta fin de mes"\n• "Desactiva la promoción del día de la madre"\n• "Cambia la prioridad del ID 27 a 2"\n• "Modifica la fecha de término del ID 30 al 31 de diciembre"\n• "Agregar comandos de una orden, no agregar mas de un cambio a la vez"`,
       tipo: 'texto',
+      mostrarBotonModo: true,
       timestamp: new Date().toISOString()
     }
     setMensajes([mensajeBienvenida])
+  }
+
+  const agregarMensajeBienvenidaChatIA = () => {
+    const mensajeBienvenida = {
+      rol: 'assistant',
+      contenido: `Bienvenido al **Modo ChatIA**\n\nAhora puedo ayudarte con cualquier tema:\n\n• Programación y código\n• Consultas generales\n• Ideas creativas\n• Explicaciones\n• Y mucho más...\n\nPregúntame lo que necesites.`,
+      tipo: 'texto',
+      mostrarBotonModo: true,
+      timestamp: new Date().toISOString()
+    }
+    setMensajes([mensajeBienvenida])
+  }
+
+  const toggleModoChatIA = () => {
+    setModoChatIA(!modoChatIA)
+    setMensajes([])
+    setAccionPendiente(null)
+    if (!modoChatIA) {
+      // Cambiando a modo ChatIA
+      agregarMensajeBienvenidaChatIA()
+    } else {
+      // Volviendo a modo controlador
+      agregarMensajeBienvenida()
+    }
   }
 
   // ═══════════════════════════════════════════════════════════════
@@ -116,36 +144,98 @@ const Chat = () => {
         contenido: m.contenido
       }))
 
-      const respuesta = await procesarMensajeIA(textoMensaje, {
-        nombreUsuario: usuario.nombre,
-        nombreMarca: usuario.nombre_marca,
-        idMarca: usuario.id_marca,
-        esSuperAdmin,
-        datosMarca,
-        historial
-      })
+      let respuesta
+
+      // Usar función según el modo activo
+      if (modoChatIA) {
+        // Modo ChatIA: chat directo sin funciones de base de datos
+        respuesta = await chatDirectoIA(textoMensaje, historial)
+      } else {
+        // Modo controlador: con funciones de base de datos
+        respuesta = await procesarMensajeIA(textoMensaje, {
+          nombreUsuario: usuario.nombre,
+          nombreMarca: usuario.nombre_marca,
+          idMarca: usuario.id_marca,
+          esSuperAdmin,
+          datosMarca,
+          historial,
+          accionPendienteActual: accionPendiente
+        })
+      }
 
       console.log('📥 Respuesta de IA:', respuesta)
+      console.log('📋 Acción pendiente actual:', accionPendiente)
 
-      // Si es una acción confirmada, ejecutarla automáticamente
+      // En modo ChatIA, solo mostramos la respuesta sin procesar acciones
+      if (modoChatIA) {
+        const mensajeRespuesta = {
+          rol: 'assistant',
+          contenido: respuesta.contenido,
+          tipo: respuesta.tipo,
+          timestamp: new Date().toISOString()
+        }
+        setMensajes(prev => [...prev, mensajeRespuesta])
+
+        await guardarMensajeChat({
+          usuario_id: usuario.id,
+          sesion_id: sesionChatId,
+          rol: 'assistant',
+          contenido: respuesta.contenido,
+          tipo_respuesta: 'chat_ia'
+        })
+
+        setEnviando(false)
+        inputRef.current?.focus()
+        return
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // MANEJO DE ACCIONES CONFIRMADAS (solo en modo controlador)
+      // ═══════════════════════════════════════════════════════════════
+
+      // Si es una acción confirmada CON ejecutar, ejecutarla
       if (respuesta.tipo === 'accion_confirmada' && respuesta.ejecutar) {
+        console.log('🎬 Ejecutando acción desde respuesta.ejecutar:', respuesta.ejecutar)
         await ejecutarAccion(respuesta.ejecutar)
         return
       }
 
-      // Si es una confirmación pendiente, guardar para referencia
-      if (respuesta.tipo === 'confirmacion' && respuesta.resumen) {
-        setAccionPendiente(respuesta.resumen)
+      // Si es una acción confirmada SIN ejecutar, pero tenemos acción pendiente guardada
+      if (respuesta.tipo === 'accion_confirmada' && !respuesta.ejecutar && accionPendiente) {
+        console.log('🔄 Ejecutando acción desde accionPendiente guardada:', accionPendiente)
+        await ejecutarAccion({
+          accion: accionPendiente.accion,
+          parametros: accionPendiente.parametros
+        })
+        return
       }
 
-      // Agregar respuesta al chat
+      // ═══════════════════════════════════════════════════════════════
+      // MANEJO DE CONFIRMACIONES PENDIENTES
+      // ═══════════════════════════════════════════════════════════════
+
+      // Si es una confirmación pendiente, guardar para referencia futura
+      if (respuesta.tipo === 'confirmacion' && respuesta.accionPendiente) {
+        console.log('💾 Guardando nueva acción pendiente:', respuesta.accionPendiente)
+        setAccionPendiente(respuesta.accionPendiente)
+      } else if (respuesta.tipo !== 'confirmacion' && respuesta.tipo !== 'accion_confirmada') {
+        // Limpiar acción pendiente si la respuesta no es una confirmación ni ejecución
+        // (el usuario cambió de tema)
+        if (accionPendiente) {
+          console.log('🧹 Limpiando acción pendiente (usuario cambió de tema)')
+          setAccionPendiente(null)
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // AGREGAR RESPUESTA AL CHAT
+      // ═══════════════════════════════════════════════════════════════
+
       const mensajeRespuesta = {
         rol: 'assistant',
         contenido: respuesta.contenido,
         tipo: respuesta.tipo,
         datos: respuesta.datos,
-        tabla_preview: respuesta.tabla_preview,
-        resumen: respuesta.resumen,
         timestamp: new Date().toISOString()
       }
       setMensajes(prev => [...prev, mensajeRespuesta])
@@ -157,7 +247,7 @@ const Chat = () => {
         rol: 'assistant',
         contenido: respuesta.contenido,
         tipo_respuesta: respuesta.tipo,
-        datos_extra: respuesta.datos || respuesta.tabla_preview || respuesta.resumen
+        datos_extra: respuesta.datos || respuesta.accionPendiente
       })
 
     } catch (err) {
@@ -181,13 +271,15 @@ const Chat = () => {
 
   const ejecutarAccion = async (ejecutar) => {
     const { accion, parametros } = ejecutar
-    console.log('🎬 Ejecutando acción:', accion, parametros)
+    console.log('🎬 Ejecutando acción:', accion)
+    console.log('📝 Parámetros:', JSON.stringify(parametros, null, 2))
 
     let resultado
 
     try {
       switch (accion) {
         case 'agregar':
+          console.log('➕ Agregando nuevo registro...')
           resultado = await agregarDato({
             'ID marca': usuario.id_marca,
             'Nombre marca': usuario.nombre_marca,
@@ -201,16 +293,34 @@ const Chat = () => {
           break
 
         case 'modificar':
+          console.log('✏️ Modificando registro ID:', parametros.id_fila)
+          console.log('📋 Updates a aplicar:', parametros.updates)
+          
+          if (!parametros.id_fila) {
+            throw new Error('No se especificó el ID del registro a modificar')
+          }
+          if (!parametros.updates || Object.keys(parametros.updates).length === 0) {
+            throw new Error('No se especificaron los cambios a realizar')
+          }
+          
           resultado = await modificarDato(parametros.id_fila, parametros.updates)
           break
 
         case 'desactivar':
+          console.log('🛑 Desactivando registro ID:', parametros.id_fila)
+          
+          if (!parametros.id_fila) {
+            throw new Error('No se especificó el ID del registro a desactivar')
+          }
+          
           resultado = await desactivarDato(parametros.id_fila)
           break
 
         default:
-          resultado = { success: false, error: 'Acción no reconocida' }
+          resultado = { success: false, error: `Acción no reconocida: ${accion}` }
       }
+
+      console.log('📊 Resultado de la acción:', resultado)
 
       // Log de acción
       await guardarLogAccion({
@@ -241,7 +351,7 @@ const Chat = () => {
             ['Prioridad', datos.prioridad],
             ['Estado', datos.Estado ? '✅ Activo' : '❌ Inactivo'],
             ['Fecha inicio', datos.fecha_inicio ? new Date(datos.fecha_inicio).toLocaleDateString('es-CL') : '—'],
-            ['Fecha vencimiento', datos.fecha_caducidad ? new Date(datos.fecha_caducidad).toLocaleDateString('es-CL') : '—']
+            ['Fecha término', datos.fecha_caducidad ? new Date(datos.fecha_caducidad).toLocaleDateString('es-CL') : '—']
           ]
         }
 
@@ -253,13 +363,14 @@ const Chat = () => {
 
         mensajeResultado = {
           rol: 'assistant',
-          contenido: `¡Listo! El registro ha sido ${accionTexto} exitosamente. 🎉`,
+          contenido: `Listo. El registro ha sido ${accionTexto} exitosamente.`,
           tipo: 'exito',
           datos: tablaResultado,
           timestamp: new Date().toISOString()
         }
 
-        // Recargar datos
+        // Recargar datos de la marca para reflejar los cambios
+        console.log('🔄 Recargando datos de la marca...')
         await cargarDatosMarca()
       } else {
         mensajeResultado = {
@@ -271,10 +382,13 @@ const Chat = () => {
       }
 
       setMensajes(prev => [...prev, mensajeResultado])
+      
+      // Limpiar acción pendiente después de ejecutar
       setAccionPendiente(null)
+      console.log('🧹 Acción pendiente limpiada')
 
     } catch (err) {
-      console.error('Error ejecutando acción:', err)
+      console.error('❌ Error ejecutando acción:', err)
       const mensajeError = {
         rol: 'assistant',
         contenido: `Error ejecutando la acción: ${err.message}`,
@@ -282,6 +396,7 @@ const Chat = () => {
         timestamp: new Date().toISOString()
       }
       setMensajes(prev => [...prev, mensajeError])
+      setAccionPendiente(null)
     }
 
     setEnviando(false)
@@ -310,6 +425,54 @@ const Chat = () => {
     }
   }
 
+  // Función para manejar respuestas rápidas desde los botones Sí/No
+  const handleRespuestaRapida = async (respuesta) => {
+    if (enviando) return
+
+    setEnviando(true)
+    incrementarMensajes()
+
+    // Agregar mensaje del usuario
+    const mensajeUsuario = {
+      rol: 'user',
+      contenido: respuesta,
+      timestamp: new Date().toISOString()
+    }
+    setMensajes(prev => [...prev, mensajeUsuario])
+
+    // Guardar en Supabase
+    await guardarMensajeChat({
+      usuario_id: usuario.id,
+      sesion_id: sesionChatId,
+      rol: 'user',
+      contenido: respuesta
+    })
+
+    // Procesar la respuesta
+    if (respuesta.toLowerCase() === 'sí' || respuesta.toLowerCase() === 'si') {
+      // Ejecutar la acción pendiente
+      if (accionPendiente) {
+        await ejecutarAccion({
+          accion: accionPendiente.accion,
+          parametros: accionPendiente.parametros
+        })
+      } else {
+        setEnviando(false)
+      }
+    } else {
+      // Cancelar la acción
+      const mensajeCancelado = {
+        rol: 'assistant',
+        contenido: 'Entendido, he cancelado la acción. ¿En qué más puedo ayudarte?',
+        tipo: 'texto',
+        timestamp: new Date().toISOString()
+      }
+      setMensajes(prev => [...prev, mensajeCancelado])
+      setAccionPendiente(null)
+      setEnviando(false)
+    }
+  }
+
   if (!usuario) return null
 
   // ═══════════════════════════════════════════════════════════════
@@ -317,11 +480,11 @@ const Chat = () => {
   // ═══════════════════════════════════════════════════════════════
 
   return (
-    <div className="chat-container">
-      {/* Header */}
+    <div className="app-layout">
+      {/* Header Global */}
       <header className="chat-header">
         <div className="header-left">
-          <span className="header-logo">🚀</span>
+          <span className="header-logo">◈</span>
           <div className="header-info">
             <h1>Admin Panel</h1>
             <span className="header-marca">{usuario.nombre_marca}</span>
@@ -332,59 +495,118 @@ const Chat = () => {
             <span className="user-name">{usuario.nombre}</span>
             {esSuperAdmin && <span className="badge-admin">Super Admin</span>}
           </div>
+          {modoChatIA && (
+            <span className="badge-modo-chat">◆ Modo ChatIA</span>
+          )}
+          {!modoChatIA && (
+            <button
+              onClick={() => setMostrarEditor(!mostrarEditor)}
+              className={`btn-icon btn-toggle-editor ${mostrarEditor ? 'active' : ''}`}
+              title={mostrarEditor ? 'Ocultar editor' : 'Mostrar editor'}
+            >
+              ≡
+            </button>
+          )}
           <button onClick={handleReiniciarChat} className="btn-icon" title="Reiniciar chat">
-            🔄
+            ↻
           </button>
           <button onClick={handleLogout} className="btn-icon btn-logout" title="Cerrar sesión">
-            🚪
+            ⏻
           </button>
         </div>
       </header>
 
-      {/* Mensajes */}
-      <main className="chat-messages">
-        {mensajes.map((mensaje, index) => (
-          <MensajeChat key={index} mensaje={mensaje} />
-        ))}
-        
-        {enviando && (
-          <div className="mensaje-loading">
-            <div className="typing-indicator">
-              <span></span>
-              <span></span>
-              <span></span>
+      {/* Layout principal dividido */}
+      <div className="main-layout">
+        {/* Panel izquierdo: Chat */}
+        <div className={`chat-panel ${!mostrarEditor ? 'full-width' : ''}`}>
+          {/* Indicador de acción pendiente (solo en modo controlador) */}
+          {!modoChatIA && accionPendiente && (
+            <div className="accion-pendiente-indicator">
+              <span>●</span>
+              <span>Acción pendiente: <strong>{accionPendiente.accion}</strong></span>
+              <span className="accion-id">
+                {accionPendiente.accion === 'modificar' && accionPendiente.parametros?.id_fila &&
+                  `(ID: ${accionPendiente.parametros.id_fila})`
+                }
+              </span>
             </div>
-            <span>Pensando...</span>
+          )}
+
+          {/* Mensajes */}
+          <main className="chat-messages">
+            {mensajes.map((mensaje, index) => (
+              <MensajeChat
+                key={index}
+                mensaje={mensaje}
+                modoChatIA={modoChatIA}
+                onToggleModo={toggleModoChatIA}
+                onRespuestaRapida={handleRespuestaRapida}
+              />
+            ))}
+
+            {enviando && (
+              <div className="mensaje-loading">
+                <div className="typing-indicator">
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </div>
+                <span>Pensando...</span>
+              </div>
+            )}
+
+            <div ref={chatEndRef} />
+          </main>
+
+          {/* Input */}
+          <footer className="chat-input-container">
+            <div className="mensajes-restantes">
+              {20 - mensajesCount} mensajes restantes en esta sesión
+            </div>
+            <form onSubmit={handleEnviarMensaje} className="chat-input-form">
+              <textarea
+                ref={inputRef}
+                value={inputMensaje}
+                onChange={(e) => setInputMensaje(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Escribe tu mensaje... (Enter para enviar)"
+                disabled={enviando || mensajesCount >= 20}
+                rows={1}
+              />
+              <button
+                type="submit"
+                disabled={enviando || !inputMensaje.trim() || mensajesCount >= 20}
+                className="btn-enviar"
+              >
+                {enviando ? '...' : '→'}
+              </button>
+            </form>
+          </footer>
+        </div>
+
+        {/* Panel derecho: Editor Manual (solo en modo controlador) */}
+        {!modoChatIA && mostrarEditor && (
+          <div className="editor-panel">
+            <EditorManual
+              usuario={usuario}
+              esSuperAdmin={esSuperAdmin}
+              onDatosActualizados={cargarDatosMarca}
+            />
           </div>
         )}
-        
-        <div ref={chatEndRef} />
-      </main>
 
-      {/* Input */}
-      <footer className="chat-input-container">
-        <div className="mensajes-restantes">
-          {20 - mensajesCount} mensajes restantes en esta sesión
-        </div>
-        <form onSubmit={handleEnviarMensaje} className="chat-input-form">
-          <textarea
-            ref={inputRef}
-            value={inputMensaje}
-            onChange={(e) => setInputMensaje(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Escribe tu mensaje... (Enter para enviar)"
-            disabled={enviando || mensajesCount >= 20}
-            rows={1}
-          />
-          <button 
-            type="submit" 
-            disabled={enviando || !inputMensaje.trim() || mensajesCount >= 20}
-            className="btn-enviar"
-          >
-            {enviando ? '⏳' : '📤'}
-          </button>
-        </form>
-      </footer>
+        {/* Botón flotante para alternar entre modos */}
+        <button
+          className={`btn-flotante-modo ${modoChatIA ? 'modo-controlador' : 'modo-chatia'}`}
+          onClick={toggleModoChatIA}
+        >
+          <span className="btn-flotante-icon">{modoChatIA ? '◀' : '◆'}</span>
+          <span className="btn-flotante-texto">
+            {modoChatIA ? 'Volver al Controlador' : 'Modo ChatIA'}
+          </span>
+        </button>
+      </div>
     </div>
   )
 }
