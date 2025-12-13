@@ -228,15 +228,20 @@ const Chat = () => {
 
         let mensajeResultado
         if (resultadoComentarios.success && resultadoComentarios.data.length > 0) {
-          // Crear tabla con los comentarios
-          const columnas = ['ID', 'Comentario', 'Clasificacion', 'Inapropiado', 'Fecha']
-          const filas = resultadoComentarios.data.map(c => [
-            c.id,
-            (c.comentario || c.texto || c.mensaje || '').substring(0, 80) + ((c.comentario || c.texto || c.mensaje || '').length > 80 ? '...' : ''),
-            c.clasificacion || c.categoria || '—',
-            c.es_inapropiado ? 'Si' : 'No',
-            c.creado_en ? new Date(c.creado_en).toLocaleDateString('es-CL') : '—'
-          ])
+          // Crear tabla con los comentarios - usando nombres reales de columnas
+          const columnas = ['ID', 'Comentario Original', 'Respuesta', 'Plataforma', 'Inapropiado', 'Fecha']
+          const filas = resultadoComentarios.data.map(c => {
+            const comentario = c.comentario_original || c.texto_publicacion || ''
+            const respuestaComentario = c.respuesta_comentario || c.mensaje_inbox || ''
+            return [
+              c.id,
+              comentario.substring(0, 60) + (comentario.length > 60 ? '...' : ''),
+              respuestaComentario.substring(0, 60) + (respuestaComentario.length > 60 ? '...' : ''),
+              c.plataforma || '—',
+              c.es_inapropiado ? 'Si' : 'No',
+              c.creado_en ? new Date(c.creado_en).toLocaleDateString('es-CL') : '—'
+            ]
+          })
 
           mensajeResultado = {
             rol: 'assistant',

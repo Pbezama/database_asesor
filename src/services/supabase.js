@@ -258,9 +258,9 @@ export const consultarComentarios = async (opciones = {}) => {
       query = query.eq('es_inapropiado', true)
     }
 
-    // Filtro por clasificacion especifica
+    // Filtro por razon de inapropiado
     if (clasificacion) {
-      query = query.ilike('clasificacion', `%${clasificacion}%`)
+      query = query.ilike('razon_inapropiado', `%${clasificacion}%`)
     }
 
     // Filtro por rango de fechas
@@ -280,9 +280,10 @@ export const consultarComentarios = async (opciones = {}) => {
     if (filtroTexto && resultados.length > 0) {
       const textoLower = filtroTexto.toLowerCase()
       resultados = resultados.filter(c => {
-        const comentario = (c.comentario || c.texto || c.mensaje || '').toLowerCase()
-        const clasificacionTexto = (c.clasificacion || c.categoria || '').toLowerCase()
-        return comentario.includes(textoLower) || clasificacionTexto.includes(textoLower)
+        const comentario = (c.comentario_original || c.texto_publicacion || '').toLowerCase()
+        const respuesta = (c.respuesta_comentario || c.mensaje_inbox || '').toLowerCase()
+        const razon = (c.razon_inapropiado || '').toLowerCase()
+        return comentario.includes(textoLower) || respuesta.includes(textoLower) || razon.includes(textoLower)
       })
     }
 
