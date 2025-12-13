@@ -8,7 +8,8 @@ import {
   guardarLogAccion,
   agregarDato,
   modificarDato,
-  desactivarDato
+  desactivarDato,
+  consultarComentarios
 } from '../services/supabase'
 import { procesarMensajeIA, chatDirectoIA } from '../services/openai'
 import MensajeChat from '../components/MensajeChat'
@@ -66,7 +67,7 @@ const Chat = () => {
 
     const mensajeBienvenida = {
       rol: 'assistant',
-      contenido: `${saludo}, ${usuario.nombre}.\n\nSoy tu asistente para administrar los datos de **${usuario.nombre_marca}**.\n\nPuedes hablarme en lenguaje natural, por ejemplo:\n\n• "Muéstrame toda mi información"\n• "Quiero agregar una promoción de 20% de descuento hasta fin de mes"\n• "Desactiva la promoción del día de la madre"\n• "Cambia la prioridad del ID 27 a 2"\n• "Modifica la fecha de término del ID 30 al 31 de diciembre"\n• "Agregar comandos de una orden, no agregar mas de un cambio a la vez"`,
+      contenido: `${saludo}, ${usuario.nombre}.\n\nSoy tu asistente para administrar los datos de **${usuario.nombre_marca}**.\n\nPuedes hablarme en lenguaje natural, por ejemplo:\n\n• "Muéstrame toda mi información"\n• "Quiero agregar una promoción de 20% de descuento hasta fin de mes"\n• "Desactiva la promoción del día de la madre"\n• "Cambia la prioridad del ID 27 a 2"\n• "Muéstrame los comentarios inapropiados"\n• "Buscar comentarios que contengan insultos"`,
       tipo: 'texto',
       mostrarBotonModo: true,
       timestamp: new Date().toISOString()
@@ -206,6 +207,61 @@ const Chat = () => {
           tipo_respuesta: 'chat_ia'
         })
 
+        setEnviando(false)
+        inputRef.current?.focus()
+        return
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // MANEJO DE CONSULTA DE COMENTARIOS
+      // ═══════════════════════════════════════════════════════════════
+
+      if (respuesta.tipo === 'consultar_comentarios') {
+        console.log('📝 Consultando comentarios con filtros:', respuesta.filtros)
+
+        const filtros = {
+          idMarca: esSuperAdmin ? null : usuario.id_marca,
+          ...respuesta.filtros
+        }
+
+        const resultadoComentarios = await consultarComentarios(filtros)
+
+        let mensajeResultado
+        if (resultadoComentarios.success && resultadoComentarios.data.length > 0) {
+          // Crear tabla con los comentarios
+          const columnas = ['ID', 'Comentario', 'Clasificacion', 'Inapropiado', 'Fecha']
+          const filas = resultadoComentarios.data.map(c => [
+            c.id,
+            (c.comentario || c.texto || c.mensaje || '').substring(0, 80) + ((c.comentario || c.texto || c.mensaje || '').length > 80 ? '...' : ''),
+            c.clasificacion || c.categoria || '—',
+            c.es_inapropiado ? 'Si' : 'No',
+            c.creado_en ? new Date(c.creado_en).toLocaleDateString('es-CL') : '—'
+          ])
+
+          mensajeResultado = {
+            rol: 'assistant',
+            contenido: respuesta.mensaje || `Encontre ${resultadoComentarios.total} comentarios.`,
+            tipo: 'tabla',
+            datos: { columnas, filas },
+            timestamp: new Date().toISOString()
+          }
+        } else if (resultadoComentarios.success && resultadoComentarios.data.length === 0) {
+          mensajeResultado = {
+            rol: 'assistant',
+            contenido: 'No encontre comentarios con los filtros especificados.',
+            tipo: 'texto',
+            timestamp: new Date().toISOString()
+          }
+        } else {
+          mensajeResultado = {
+            rol: 'assistant',
+            contenido: `Error consultando comentarios: ${resultadoComentarios.error}`,
+            tipo: 'error',
+            timestamp: new Date().toISOString()
+          }
+        }
+
+        setMensajes(prev => [...prev, mensajeResultado])
         setEnviando(false)
         inputRef.current?.focus()
         return

@@ -229,6 +229,70 @@ export const obtenerLogsComentarios = async (idMarca, limite = 50) => {
   }
 }
 
+// Funcion avanzada para consultar comentarios con filtros
+export const consultarComentarios = async (opciones = {}) => {
+  try {
+    const {
+      idMarca = null,
+      limite = 100,
+      filtroTexto = null,
+      soloInapropiados = false,
+      clasificacion = null,
+      fechaDesde = null,
+      fechaHasta = null
+    } = opciones
+
+    let query = supabase
+      .from('logs_comentarios')
+      .select('*')
+      .order('creado_en', { ascending: false })
+      .limit(limite)
+
+    // Filtro por marca
+    if (idMarca) {
+      query = query.eq('id_marca', idMarca)
+    }
+
+    // Filtro por comentarios inapropiados
+    if (soloInapropiados) {
+      query = query.eq('es_inapropiado', true)
+    }
+
+    // Filtro por clasificacion especifica
+    if (clasificacion) {
+      query = query.ilike('clasificacion', `%${clasificacion}%`)
+    }
+
+    // Filtro por rango de fechas
+    if (fechaDesde) {
+      query = query.gte('creado_en', fechaDesde)
+    }
+    if (fechaHasta) {
+      query = query.lte('creado_en', fechaHasta)
+    }
+
+    const { data, error } = await query
+    if (error) throw error
+
+    let resultados = data || []
+
+    // Filtro por texto en el comentario (busqueda flexible)
+    if (filtroTexto && resultados.length > 0) {
+      const textoLower = filtroTexto.toLowerCase()
+      resultados = resultados.filter(c => {
+        const comentario = (c.comentario || c.texto || c.mensaje || '').toLowerCase()
+        const clasificacionTexto = (c.clasificacion || c.categoria || '').toLowerCase()
+        return comentario.includes(textoLower) || clasificacionTexto.includes(textoLower)
+      })
+    }
+
+    return { success: true, data: resultados, total: resultados.length }
+  } catch (err) {
+    console.error('Error consultando comentarios:', err)
+    return { success: false, error: err.message, data: [] }
+  }
+}
+
 export const guardarLogAccion = async (log) => {
   try {
     const logCompleto = {

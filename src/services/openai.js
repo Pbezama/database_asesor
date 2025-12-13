@@ -125,6 +125,27 @@ CATEGORÍAS: prompt, promocion, regla, horario, info, precio, estilo_respuesta, 
 PRIORIDADES: 1=Obligatorio, 2-3=Importante, 4-6=Opcional
 
 ══════════════════════════════════════════════════════════════════════════════
+CONSULTA DE COMENTARIOS (logs_comentarios)
+══════════════════════════════════════════════════════════════════════════════
+
+Puedes consultar la tabla de comentarios/logs cuando el usuario lo pida.
+Ejemplos de solicitudes:
+- "muestrame los comentarios"
+- "quiero ver los comentarios ofensivos"
+- "filtra comentarios inapropiados"
+- "busca comentarios que mencionen [palabra]"
+
+FORMATO PARA CONSULTAR COMENTARIOS:
+{"tipo":"consultar_comentarios","mensaje":"Buscando comentarios...","filtros":{"soloInapropiados":false,"clasificacion":null,"filtroTexto":null,"limite":50}}
+
+Ejemplos de filtros:
+- Todos: {"soloInapropiados":false,"clasificacion":null,"filtroTexto":null}
+- Solo ofensivos/inapropiados: {"soloInapropiados":true}
+- Por clasificacion: {"clasificacion":"ofensivo"} o {"clasificacion":"spam"}
+- Por texto: {"filtroTexto":"palabra a buscar"}
+- Combinados: {"soloInapropiados":true,"filtroTexto":"insulto"}
+
+══════════════════════════════════════════════════════════════════════════════
 ⚠️ REGLA CRÍTICA - FORMATO DE RESPUESTA
 ══════════════════════════════════════════════════════════════════════════════
 
@@ -272,8 +293,20 @@ Usuario: "ok" (después de pedir desactivar)
 Usuario: "cambia el ID 27 y 28 a prioridad 2"
 ✅ {"tipo":"texto","mensaje":"Para evitar errores, necesito hacer los cambios de uno en uno 😊\\n\\n¿Empezamos modificando el ID 27 a prioridad 2?"}
 
+Usuario: "muestrame los comentarios"
+✅ {"tipo":"consultar_comentarios","mensaje":"Buscando todos los comentarios...","filtros":{"soloInapropiados":false,"limite":50}}
+
+Usuario: "quiero ver los comentarios ofensivos"
+✅ {"tipo":"consultar_comentarios","mensaje":"Buscando comentarios ofensivos...","filtros":{"soloInapropiados":true,"clasificacion":"ofensivo"}}
+
+Usuario: "filtra comentarios inapropiados"
+✅ {"tipo":"consultar_comentarios","mensaje":"Buscando comentarios inapropiados...","filtros":{"soloInapropiados":true}}
+
+Usuario: "busca comentarios que mencionen spam"
+✅ {"tipo":"consultar_comentarios","mensaje":"Buscando comentarios con 'spam'...","filtros":{"filtroTexto":"spam"}}
+
 ══════════════════════════════════════════════════════════════════════════════
-❌ NUNCA HAGAS ESTO
+NUNCA HAGAS ESTO
 ══════════════════════════════════════════════════════════════════════════════
 
 ❌ Mezclar texto con JSON: "Entendido, procederemos... {"tipo":"accion"...}"
@@ -373,7 +406,9 @@ Usuario: "cambia el ID 27 y 28 a prioridad 2"
         contenido: contenidoLimpio || respuestaRaw,
         datos: parsed.datos || null,
         ejecutar: parsed.ejecutar || null,
-        accionPendiente: null
+        accionPendiente: null,
+        filtros: parsed.filtros || null,
+        mensaje: parsed.mensaje || null
       }
 
       // Si es confirmación, guardar los parámetros para cuando el usuario confirme
