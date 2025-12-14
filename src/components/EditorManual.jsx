@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import {
   obtenerDatosMarca,
   obtenerTodasLasMarcas,
@@ -7,6 +7,7 @@ import {
   desactivarDato,
   consultarComentarios
 } from '../services/supabase'
+import MenuDescarga from './MenuDescarga'
 import '../styles/EditorManual.css'
 
 // Categorías predefinidas para el desplegable
@@ -47,7 +48,11 @@ const EditorManual = ({ usuario, esSuperAdmin, onDatosActualizados }) => {
   const [comentarios, setComentarios] = useState([])
   const [cargandoComentarios, setCargandoComentarios] = useState(false)
   const [paginaComentarios, setPaginaComentarios] = useState(1)
-  const COMENTARIOS_POR_PAGINA = 20
+  const [filasPorPagina, setFilasPorPagina] = useState(20)
+  const [ordenColumna, setOrdenColumna] = useState('creado_en')
+  const [ordenDireccion, setOrdenDireccion] = useState('desc')
+  const [filtroComentarios, setFiltroComentarios] = useState('')
+  const [filtroTipo, setFiltroTipo] = useState('todos') // 'todos' | 'inapropiados' | 'con_respuesta'
 
   useEffect(() => {
     cargarDatos()
@@ -80,12 +85,79 @@ const EditorManual = ({ usuario, esSuperAdmin, onDatosActualizados }) => {
     setCargandoComentarios(false)
   }
 
+  // Filtrar, ordenar y paginar comentarios
+  const comentariosProcesados = useMemo(() => {
+    let resultado = [...comentarios]
+
+    // Filtrar por tipo
+    if (filtroTipo === 'inapropiados') {
+      resultado = resultado.filter(c => c.es_inapropiado)
+    } else if (filtroTipo === 'con_respuesta') {
+      resultado = resultado.filter(c => c.respuesta_comentario)
+    }
+
+    // Filtrar por texto
+    if (filtroComentarios) {
+      const busqueda = filtroComentarios.toLowerCase()
+      resultado = resultado.filter(c =>
+        (c.comentario_original || '').toLowerCase().includes(busqueda) ||
+        (c.texto_publicacion || '').toLowerCase().includes(busqueda) ||
+        (c.respuesta_comentario || '').toLowerCase().includes(busqueda)
+      )
+    }
+
+    // Ordenar
+    resultado.sort((a, b) => {
+      let valorA = a[ordenColumna]
+      let valorB = b[ordenColumna]
+
+      // Manejar fechas
+      if (ordenColumna === 'creado_en') {
+        valorA = new Date(valorA || 0)
+        valorB = new Date(valorB || 0)
+      }
+
+      // Manejar números
+      if (ordenColumna === 'id') {
+        valorA = Number(valorA) || 0
+        valorB = Number(valorB) || 0
+      }
+
+      // Manejar strings
+      if (typeof valorA === 'string') valorA = valorA.toLowerCase()
+      if (typeof valorB === 'string') valorB = valorB.toLowerCase()
+
+      if (valorA < valorB) return ordenDireccion === 'asc' ? -1 : 1
+      if (valorA > valorB) return ordenDireccion === 'asc' ? 1 : -1
+      return 0
+    })
+
+    return resultado
+  }, [comentarios, filtroComentarios, filtroTipo, ordenColumna, ordenDireccion])
+
   // Calcular comentarios paginados
-  const totalPaginasComentarios = Math.ceil(comentarios.length / COMENTARIOS_POR_PAGINA)
-  const comentariosPaginados = comentarios.slice(
-    (paginaComentarios - 1) * COMENTARIOS_POR_PAGINA,
-    paginaComentarios * COMENTARIOS_POR_PAGINA
+  const totalPaginasComentarios = Math.ceil(comentariosProcesados.length / filasPorPagina)
+  const comentariosPaginados = comentariosProcesados.slice(
+    (paginaComentarios - 1) * filasPorPagina,
+    paginaComentarios * filasPorPagina
   )
+
+  // Cambiar ordenamiento
+  const cambiarOrden = (columna) => {
+    if (ordenColumna === columna) {
+      setOrdenDireccion(ordenDireccion === 'asc' ? 'desc' : 'asc')
+    } else {
+      setOrdenColumna(columna)
+      setOrdenDireccion('desc')
+    }
+    setPaginaComentarios(1)
+  }
+
+  // Icono de orden
+  const iconoOrden = (columna) => {
+    if (ordenColumna !== columna) return ''
+    return ordenDireccion === 'asc' ? ' ↑' : ' ↓'
+  }
 
   // Cargar comentarios cuando se cambia a esa vista
   useEffect(() => {
@@ -269,34 +341,101 @@ const EditorManual = ({ usuario, esSuperAdmin, onDatosActualizados }) => {
       {/* ════════════════════════════════════════════════════════════════ */}
       {vistaActiva === 'comentarios' && (
         <div className="comentarios-section">
+          {/* Header con acciones */}
           <div className="comentarios-header">
-            <span>{comentarios.length} comentarios totales</span>
-            <button className="btn-refresh" onClick={cargarComentarios} title="Actualizar">
-              ↻
-            </button>
+            <span>{comentariosProcesados.length} de {comentarios.length} comentarios</span>
+            <div className="comentarios-acciones">
+              <MenuDescarga
+                datos={comentariosProcesados}
+                mapeoColumnas={{
+                  'ID': 'id',
+                  'Comentario Original': 'comentario_original',
+                  'Texto Publicacion': 'texto_publicacion',
+                  'Respuesta': 'respuesta_comentario',
+                  'Mensaje Inbox': 'mensaje_inbox',
+                  'Fecha': 'creado_en'
+                }}
+                nombreArchivo={`comentarios_${usuario.nombre_marca}`}
+                titulo={`Comentarios - ${usuario.nombre_marca}`}
+                tipo="comentarios"
+                nombreMarca={usuario.nombre_marca}
+                campoFecha="creado_en"
+              />
+              <button className="btn-refresh" onClick={cargarComentarios} title="Actualizar">
+                ↻
+              </button>
+            </div>
+          </div>
+
+          {/* Filtros de comentarios */}
+          <div className="comentarios-filtros">
+            <div className="filtro-busqueda-comentarios">
+              <input
+                type="text"
+                placeholder="Buscar en comentarios..."
+                value={filtroComentarios}
+                onChange={(e) => {
+                  setFiltroComentarios(e.target.value)
+                  setPaginaComentarios(1)
+                }}
+              />
+            </div>
+            <select
+              className="filtro-tipo-comentarios"
+              value={filtroTipo}
+              onChange={(e) => {
+                setFiltroTipo(e.target.value)
+                setPaginaComentarios(1)
+              }}
+            >
+              <option value="todos">Todos</option>
+              <option value="inapropiados">Solo inapropiados</option>
+              <option value="con_respuesta">Con respuesta</option>
+            </select>
+            <select
+              className="filtro-filas"
+              value={filasPorPagina}
+              onChange={(e) => {
+                setFilasPorPagina(Number(e.target.value))
+                setPaginaComentarios(1)
+              }}
+            >
+              <option value={10}>10 filas</option>
+              <option value={20}>20 filas</option>
+              <option value={50}>50 filas</option>
+              <option value={100}>100 filas</option>
+            </select>
           </div>
 
           {cargandoComentarios ? (
             <div className="editor-loading">Cargando comentarios...</div>
           ) : comentarios.length === 0 ? (
             <div className="editor-empty">No hay comentarios</div>
+          ) : comentariosProcesados.length === 0 ? (
+            <div className="editor-empty">No hay comentarios con los filtros aplicados</div>
           ) : (
             <>
               <div className="comentarios-tabla-container">
                 <table className="comentarios-tabla">
                   <thead>
                     <tr>
-                      <th>ID</th>
-                      <th>Comentario Original</th>
+                      <th className="th-ordenable" onClick={() => cambiarOrden('id')}>
+                        ID{iconoOrden('id')}
+                      </th>
+                      <th className="th-ordenable" onClick={() => cambiarOrden('comentario_original')}>
+                        Comentario Original{iconoOrden('comentario_original')}
+                      </th>
                       <th>Texto Publicacion</th>
-                      <th>Respuesta Comentario</th>
-                      <th>Mensaje Inbox</th>
-                      <th>Fecha</th>
+                      <th>Respuesta</th>
+                      <th>Inbox</th>
+                      <th className="th-ordenable" onClick={() => cambiarOrden('creado_en')}>
+                        Fecha{iconoOrden('creado_en')}
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
                     {comentariosPaginados.map(c => (
-                      <tr key={c.id}>
+                      <tr key={c.id} className={c.es_inapropiado ? 'fila-inapropiado' : ''}>
                         <td>{c.id}</td>
                         <td title={c.comentario_original || ''}>
                           {(c.comentario_original || '').substring(0, 40)}{(c.comentario_original || '').length > 40 ? '...' : ''}
@@ -310,7 +449,7 @@ const EditorManual = ({ usuario, esSuperAdmin, onDatosActualizados }) => {
                         <td title={c.mensaje_inbox || ''}>
                           {(c.mensaje_inbox || '').substring(0, 40)}{(c.mensaje_inbox || '').length > 40 ? '...' : ''}
                         </td>
-                        <td>{c.creado_en ? new Date(c.creado_en).toLocaleDateString('es-CL') : '-'}</td>
+                        <td>{c.creado_en ? new Date(c.creado_en).toLocaleString('es-CL', { dateStyle: 'short', timeStyle: 'short' }) : '-'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -318,27 +457,25 @@ const EditorManual = ({ usuario, esSuperAdmin, onDatosActualizados }) => {
               </div>
 
               {/* Controles de paginacion */}
-              {totalPaginasComentarios > 1 && (
-                <div className="paginacion-controles">
-                  <button
-                    className="btn-paginacion"
-                    onClick={() => setPaginaComentarios(p => Math.max(1, p - 1))}
-                    disabled={paginaComentarios === 1}
-                  >
-                    ← Anterior
-                  </button>
-                  <span className="paginacion-info">
-                    Página {paginaComentarios} de {totalPaginasComentarios}
-                  </span>
-                  <button
-                    className="btn-paginacion"
-                    onClick={() => setPaginaComentarios(p => Math.min(totalPaginasComentarios, p + 1))}
-                    disabled={paginaComentarios === totalPaginasComentarios}
-                  >
-                    Siguiente →
-                  </button>
-                </div>
-              )}
+              <div className="paginacion-controles">
+                <button
+                  className="btn-paginacion"
+                  onClick={() => setPaginaComentarios(p => Math.max(1, p - 1))}
+                  disabled={paginaComentarios === 1}
+                >
+                  ← Anterior
+                </button>
+                <span className="paginacion-info">
+                  Página {paginaComentarios} de {totalPaginasComentarios || 1}
+                </span>
+                <button
+                  className="btn-paginacion"
+                  onClick={() => setPaginaComentarios(p => Math.min(totalPaginasComentarios, p + 1))}
+                  disabled={paginaComentarios >= totalPaginasComentarios}
+                >
+                  Siguiente →
+                </button>
+              </div>
             </>
           )}
         </div>
@@ -593,9 +730,27 @@ const EditorManual = ({ usuario, esSuperAdmin, onDatosActualizados }) => {
         )}
       </div>
 
-      {/* Contador */}
+      {/* Footer con contador y descarga */}
       <div className="editor-footer">
-        {datosFiltrados.length} de {datos.length} registros
+        <span>{datosFiltrados.length} de {datos.length} registros</span>
+        <MenuDescarga
+          datos={datosFiltrados}
+          mapeoColumnas={{
+            'ID': 'id',
+            'Categoria': 'categoria',
+            'Clave': 'clave',
+            'Valor': 'valor',
+            'Prioridad': 'prioridad',
+            'Estado': 'Estado',
+            'Fecha Inicio': 'fecha_inicio',
+            'Fecha Termino': 'fecha_caducidad'
+          }}
+          nombreArchivo={`datos_${usuario.nombre_marca}`}
+          titulo={`Datos de Marca - ${usuario.nombre_marca}`}
+          tipo="datos"
+          nombreMarca={usuario.nombre_marca}
+          campoFecha="fecha_inicio"
+        />
       </div>
         </>
       )}

@@ -1,4 +1,11 @@
 import { useState } from 'react'
+import {
+  descargarCSV,
+  descargarJSON,
+  descargarExcel,
+  descargarPDF,
+  descargarHTML
+} from '../services/downloadService'
 import '../styles/MensajeChat.css'
 
 const FILAS_POR_PAGINA = 20
@@ -8,6 +15,42 @@ const MensajeChat = ({ mensaje, onConfirmar, onCancelar, modoChatIA, onToggleMod
   const esUsuario = rol === 'user'
   const [respondido, setRespondido] = useState(false)
   const [paginaTabla, setPaginaTabla] = useState(1)
+  const [menuDescargaAbierto, setMenuDescargaAbierto] = useState(false)
+
+  // Función para descargar tabla
+  const descargarTabla = (formato, tablaData) => {
+    if (!tablaData || !tablaData.columnas || !tablaData.filas) return
+
+    // Convertir filas a objetos
+    const datosObj = tablaData.filas.map(fila => {
+      const obj = {}
+      tablaData.columnas.forEach((col, i) => {
+        obj[col] = fila[i]
+      })
+      return obj
+    })
+
+    const nombreArchivo = `datos_${new Date().toISOString().split('T')[0]}`
+
+    switch (formato) {
+      case 'csv':
+        descargarCSV(datosObj, tablaData.columnas, nombreArchivo)
+        break
+      case 'json':
+        descargarJSON(datosObj, nombreArchivo)
+        break
+      case 'excel':
+        descargarExcel(datosObj, tablaData.columnas, nombreArchivo)
+        break
+      case 'pdf':
+        descargarPDF(datosObj, tablaData.columnas, nombreArchivo, 'Datos del Chat')
+        break
+      case 'html':
+        descargarHTML(datosObj, tablaData.columnas, nombreArchivo, 'Datos del Chat')
+        break
+    }
+    setMenuDescargaAbierto(false)
+  }
 
   // ═══════════════════════════════════════════════════════════════
   // RENDERIZAR TABLA CON PAGINACION
@@ -30,7 +73,31 @@ const MensajeChat = ({ mensaje, onConfirmar, onCancelar, modoChatIA, onToggleMod
 
     return (
       <div className="tabla-container">
-        {titulo && <div className="tabla-titulo">{titulo}</div>}
+        <div className="tabla-header-acciones">
+          {titulo && <div className="tabla-titulo">{titulo}</div>}
+          {totalFilas > 0 && (
+            <div className="tabla-descarga-container">
+              <button
+                className="btn-descarga-tabla"
+                onClick={() => setMenuDescargaAbierto(!menuDescargaAbierto)}
+              >
+                ↓ Descargar
+              </button>
+              {menuDescargaAbierto && (
+                <>
+                  <div className="menu-descarga-overlay" onClick={() => setMenuDescargaAbierto(false)} />
+                  <div className="menu-descarga-tabla">
+                    <button onClick={() => descargarTabla('csv', tablaData)}>📄 CSV</button>
+                    <button onClick={() => descargarTabla('excel', tablaData)}>📊 Excel</button>
+                    <button onClick={() => descargarTabla('json', tablaData)}>{ } JSON</button>
+                    <button onClick={() => descargarTabla('pdf', tablaData)}>📕 PDF</button>
+                    <button onClick={() => descargarTabla('html', tablaData)}>🌐 HTML</button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
         {necesitaPaginacion && (
           <div className="tabla-info-paginacion">
             Mostrando {((paginaTabla - 1) * FILAS_POR_PAGINA) + 1}-{Math.min(paginaTabla * FILAS_POR_PAGINA, totalFilas)} de {totalFilas} registros
