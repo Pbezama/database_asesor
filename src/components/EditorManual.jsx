@@ -4,9 +4,24 @@ import {
   obtenerTodasLasMarcas,
   agregarDato,
   modificarDato,
-  desactivarDato
+  desactivarDato,
+  consultarComentarios
 } from '../services/supabase'
 import '../styles/EditorManual.css'
+
+// Categorías predefinidas para el desplegable
+const CATEGORIAS_OPCIONES = [
+  { value: 'prompt', label: 'Prompt Principal' },
+  { value: 'promocion', label: 'Promociones' },
+  { value: 'regla', label: 'Reglas' },
+  { value: 'horario', label: 'Horarios' },
+  { value: 'info', label: 'Informacion General' },
+  { value: 'precio', label: 'Precios' },
+  { value: 'estilo_respuesta', label: 'Estilo de Respuesta' },
+  { value: 'observacion', label: 'Observaciones' },
+  { value: 'contacto', label: 'Contacto' },
+  { value: 'servicio', label: 'Servicios' }
+]
 
 const EditorManual = ({ usuario, esSuperAdmin, onDatosActualizados }) => {
   const [datos, setDatos] = useState([])
@@ -27,6 +42,11 @@ const EditorManual = ({ usuario, esSuperAdmin, onDatosActualizados }) => {
   const [guardando, setGuardando] = useState(false)
   const [mensaje, setMensaje] = useState(null)
 
+  // Estado para comentarios
+  const [vistaActiva, setVistaActiva] = useState('datos') // 'datos' | 'comentarios'
+  const [comentarios, setComentarios] = useState([])
+  const [cargandoComentarios, setCargandoComentarios] = useState(false)
+
   useEffect(() => {
     cargarDatos()
   }, [usuario])
@@ -43,8 +63,30 @@ const EditorManual = ({ usuario, esSuperAdmin, onDatosActualizados }) => {
     setCargando(false)
   }
 
-  // Obtener categorías únicas
-  const categorias = [...new Set(datos.map(d => d.categoria))].filter(Boolean)
+  // Cargar comentarios
+  const cargarComentarios = async () => {
+    setCargandoComentarios(true)
+    const filtros = {
+      idMarca: esSuperAdmin ? null : usuario.id_marca,
+      limite: 100
+    }
+    const resultado = await consultarComentarios(filtros)
+    if (resultado.success) {
+      setComentarios(resultado.data)
+    }
+    setCargandoComentarios(false)
+  }
+
+  // Cargar comentarios cuando se cambia a esa vista
+  useEffect(() => {
+    if (vistaActiva === 'comentarios' && comentarios.length === 0) {
+      cargarComentarios()
+    }
+  }, [vistaActiva])
+
+  // Obtener categorías únicas (combinando existentes con predefinidas)
+  const categoriasExistentes = [...new Set(datos.map(d => d.categoria))].filter(Boolean)
+  const todasCategorias = [...new Set([...CATEGORIAS_OPCIONES.map(c => c.value), ...categoriasExistentes])]
 
   // Filtrar datos
   const datosFiltrados = datos.filter(dato => {
@@ -179,11 +221,29 @@ const EditorManual = ({ usuario, esSuperAdmin, onDatosActualizados }) => {
       {/* Header del Editor */}
       <div className="editor-header">
         <h2>Editor Manual</h2>
+        {vistaActiva === 'datos' && (
+          <button
+            className="btn-agregar"
+            onClick={() => setMostrarFormNuevo(!mostrarFormNuevo)}
+          >
+            {mostrarFormNuevo ? '✕ Cancelar' : '+ Agregar'}
+          </button>
+        )}
+      </div>
+
+      {/* Pestanas para cambiar vista */}
+      <div className="editor-tabs">
         <button
-          className="btn-agregar"
-          onClick={() => setMostrarFormNuevo(!mostrarFormNuevo)}
+          className={`tab-btn ${vistaActiva === 'datos' ? 'active' : ''}`}
+          onClick={() => setVistaActiva('datos')}
         >
-          {mostrarFormNuevo ? '✕ Cancelar' : '+ Agregar'}
+          Datos de Marca
+        </button>
+        <button
+          className={`tab-btn ${vistaActiva === 'comentarios' ? 'active' : ''}`}
+          onClick={() => setVistaActiva('comentarios')}
+        >
+          Comentarios
         </button>
       </div>
 
@@ -194,25 +254,82 @@ const EditorManual = ({ usuario, esSuperAdmin, onDatosActualizados }) => {
         </div>
       )}
 
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {/* VISTA DE COMENTARIOS */}
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {vistaActiva === 'comentarios' && (
+        <div className="comentarios-section">
+          <div className="comentarios-header">
+            <span>{comentarios.length} comentarios</span>
+            <button className="btn-refresh" onClick={cargarComentarios} title="Actualizar">
+              ↻
+            </button>
+          </div>
+
+          {cargandoComentarios ? (
+            <div className="editor-loading">Cargando comentarios...</div>
+          ) : comentarios.length === 0 ? (
+            <div className="editor-empty">No hay comentarios</div>
+          ) : (
+            <div className="comentarios-tabla-container">
+              <table className="comentarios-tabla">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Comentario Original</th>
+                    <th>Texto Publicacion</th>
+                    <th>Respuesta Comentario</th>
+                    <th>Mensaje Inbox</th>
+                    <th>Fecha</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {comentarios.map(c => (
+                    <tr key={c.id}>
+                      <td>{c.id}</td>
+                      <td title={c.comentario_original || ''}>
+                        {(c.comentario_original || '').substring(0, 40)}{(c.comentario_original || '').length > 40 ? '...' : ''}
+                      </td>
+                      <td title={c.texto_publicacion || ''}>
+                        {(c.texto_publicacion || '').substring(0, 40)}{(c.texto_publicacion || '').length > 40 ? '...' : ''}
+                      </td>
+                      <td title={c.respuesta_comentario || ''}>
+                        {(c.respuesta_comentario || '').substring(0, 40)}{(c.respuesta_comentario || '').length > 40 ? '...' : ''}
+                      </td>
+                      <td title={c.mensaje_inbox || ''}>
+                        {(c.mensaje_inbox || '').substring(0, 40)}{(c.mensaje_inbox || '').length > 40 ? '...' : ''}
+                      </td>
+                      <td>{c.creado_en ? new Date(c.creado_en).toLocaleDateString('es-CL') : '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {/* VISTA DE DATOS DE MARCA */}
+      {/* ════════════════════════════════════════════════════════════════ */}
+      {vistaActiva === 'datos' && (
+        <>
       {/* Formulario para nuevo registro */}
       {mostrarFormNuevo && (
         <div className="form-nuevo">
           <h3>Nuevo Registro</h3>
           <div className="form-grid">
             <div className="form-group">
-              <label>Categoría *</label>
-              <input
-                type="text"
+              <label>Categoria *</label>
+              <select
                 value={formNuevo.categoria}
                 onChange={(e) => setFormNuevo({...formNuevo, categoria: e.target.value})}
-                placeholder="ej: promociones, horarios..."
-                list="categorias-list"
-              />
-              <datalist id="categorias-list">
-                {categorias.map(cat => (
-                  <option key={cat} value={cat} />
+              >
+                <option value="">Seleccionar categoria...</option>
+                {CATEGORIAS_OPCIONES.map(cat => (
+                  <option key={cat.value} value={cat.value}>{cat.label}</option>
                 ))}
-              </datalist>
+              </select>
             </div>
             <div className="form-group">
               <label>Clave *</label>
@@ -220,16 +337,16 @@ const EditorManual = ({ usuario, esSuperAdmin, onDatosActualizados }) => {
                 type="text"
                 value={formNuevo.clave}
                 onChange={(e) => setFormNuevo({...formNuevo, clave: e.target.value})}
-                placeholder="ej: descuento_navidad"
+                placeholder="ej: descuento_navidad, horario_atencion"
               />
             </div>
             <div className="form-group form-group-full">
-              <label>Valor *</label>
+              <label>Descripcion *</label>
               <textarea
                 value={formNuevo.valor}
                 onChange={(e) => setFormNuevo({...formNuevo, valor: e.target.value})}
-                placeholder="Contenido del registro..."
-                rows={3}
+                placeholder="Ej: Promocion especial de Navidad con 30% de descuento en todos los productos de la tienda. Valido solo para compras mayores a $20.000. No acumulable con otras promociones."
+                rows={4}
               />
             </div>
             <div className="form-group">
@@ -322,18 +439,16 @@ const EditorManual = ({ usuario, esSuperAdmin, onDatosActualizados }) => {
                 <div className="card-edicion">
                   <div className="form-grid">
                     <div className="form-group">
-                      <label>Categoría</label>
-                      <input
-                        type="text"
+                      <label>Categoria</label>
+                      <select
                         value={formEdicion.categoria}
                         onChange={(e) => setFormEdicion({...formEdicion, categoria: e.target.value})}
-                        list="categorias-edit-list"
-                      />
-                      <datalist id="categorias-edit-list">
-                        {categorias.map(cat => (
-                          <option key={cat} value={cat} />
+                      >
+                        <option value="">Seleccionar categoria...</option>
+                        {CATEGORIAS_OPCIONES.map(cat => (
+                          <option key={cat.value} value={cat.value}>{cat.label}</option>
                         ))}
-                      </datalist>
+                      </select>
                     </div>
                     <div className="form-group">
                       <label>Clave</label>
@@ -344,11 +459,11 @@ const EditorManual = ({ usuario, esSuperAdmin, onDatosActualizados }) => {
                       />
                     </div>
                     <div className="form-group form-group-full">
-                      <label>Valor</label>
+                      <label>Descripcion</label>
                       <textarea
                         value={formEdicion.valor}
                         onChange={(e) => setFormEdicion({...formEdicion, valor: e.target.value})}
-                        rows={3}
+                        rows={4}
                       />
                     </div>
                     <div className="form-group">
@@ -447,6 +562,8 @@ const EditorManual = ({ usuario, esSuperAdmin, onDatosActualizados }) => {
       <div className="editor-footer">
         {datosFiltrados.length} de {datos.length} registros
       </div>
+        </>
+      )}
     </div>
   )
 }

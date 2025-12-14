@@ -693,3 +693,142 @@
     font-size: 11px;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   PESTANAS (TABS)
+   ═══════════════════════════════════════════════════════════════ */
+
+.editor-tabs {
+  display: flex;
+  gap: 0;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.tab-btn {
+  flex: 1;
+  padding: 12px 16px;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 2px solid transparent;
+}
+
+.tab-btn:hover {
+  color: #3b82f6;
+  background: #eff6ff;
+}
+
+.tab-btn.active {
+  color: #3b82f6;
+  background: #ffffff;
+  border-bottom-color: #3b82f6;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SECCION DE COMENTARIOS
+   ═══════════════════════════════════════════════════════════════ */
+
+.comentarios-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.comentarios-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.comentarios-tabla-container {
+  flex: 1;
+  overflow: auto;
+  padding: 12px;
+  background: #f8fafc;
+}
+
+.comentarios-tabla {
+  width: 100%;
+  border-collapse: collapse;
+  background: #ffffff;
+  border-radius: 8px;
+  overflow: hidden;
+  font-size: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.comentarios-tabla th {
+  background: #f1f5f9;
+  padding: 10px 12px;
+  text-align: left;
+  font-weight: 600;
+  color: #475569;
+  border-bottom: 1px solid #e2e8f0;
+  white-space: nowrap;
+}
+
+.comentarios-tabla td {
+  padding: 10px 12px;
+  border-bottom: 1px solid #f1f5f9;
+  color: #334155;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.comentarios-tabla tr:hover {
+  background: #f8fafc;
+}
+
+.comentarios-tabla tr:last-child td {
+  border-bottom: none;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   RESPONSIVE COMENTARIOS Y TABS
+   ═══════════════════════════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .editor-tabs {
+    padding: 0;
+  }
+
+  .tab-btn {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  .comentarios-header {
+    padding: 10px 12px;
+    font-size: 12px;
+  }
+
+  .comentarios-tabla-container {
+    padding: 8px;
+  }
+
+  .comentarios-tabla {
+    font-size: 11px;
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .comentarios-tabla th,
+  .comentarios-tabla td {
+    padding: 8px 10px;
+    max-width: 120px;
+  }
+}
