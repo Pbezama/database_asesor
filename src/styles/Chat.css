@@ -523,21 +523,27 @@
 
   /* Chat panel movil */
   .chat-panel {
-    min-width: unset;
-    width: 100%;
-    height: 100%;
+    flex: 1 1 100% !important;
+    max-width: 100% !important;
+    min-width: unset !important;
+    width: 100% !important;
+    height: 100% !important;
     display: flex;
     flex-direction: column;
   }
 
   .chat-panel.full-width {
-    width: 100%;
+    flex: 1 1 100% !important;
+    max-width: 100% !important;
+    width: 100% !important;
   }
 
   /* Editor panel movil */
   .editor-panel {
-    width: 100%;
-    height: 100%;
+    flex: 1 1 100% !important;
+    min-width: 100% !important;
+    width: 100% !important;
+    height: 100% !important;
     border-left: none;
     border-top: none;
   }

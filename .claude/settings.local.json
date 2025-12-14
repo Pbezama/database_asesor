@@ -4,7 +4,8 @@
       "Bash(git add:*)",
       "Bash(git commit -m \"$(cat <<''EOF''\nfeat: modernizar UI con tema claro, Modo ChatIA y editor manual\n\n- Actualizar colores: fondos crema (#faf8f5) y textos oscuros para mejor contraste\n- Agregar botón flotante único para alternar entre Controlador y Modo ChatIA\n- Reemplazar emojis por iconos profesionales minimalistas (◈, ◯, ✓, ✕, →, ↻)\n- Agregar EditorManual para gestión directa de registros\n- Mejorar estilos de mensajes, confirmaciones y tablas\n- Simplificar textos de bienvenida y feedback\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")",
       "Bash(git commit -m \"$(cat <<''EOF''\nfeat: mejorar version movil y fix routing en Vercel\n\n- Agregar navegacion inferior con 3 botones (Chat BD, Editor, Chat IA)\n- Optimizar layout movil con paneles a pantalla completa\n- Mejorar estilos responsive para mejor UX en celulares\n- Agregar vercel.json para fix de rutas SPA\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n)\")",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(git commit:*)"
     ]
   }
 }

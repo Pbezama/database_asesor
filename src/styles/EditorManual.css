@@ -492,9 +492,16 @@
 @media (max-width: 768px) {
   .editor-manual {
     border-left: none;
-    height: 100%;
+    height: 100% !important;
+    width: 100% !important;
     display: flex;
     flex-direction: column;
+    overflow: hidden;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
   }
 
   /* Header movil */
@@ -605,6 +612,8 @@
     flex: 1;
     padding: 10px 12px;
     -webkit-overflow-scrolling: touch;
+    overflow-y: auto;
+    min-height: 0;
   }
 
   /* Cards movil */
@@ -803,6 +812,7 @@
 @media (max-width: 768px) {
   .editor-tabs {
     padding: 0;
+    flex-shrink: 0;
   }
 
   .tab-btn {
@@ -810,13 +820,24 @@
     font-size: 12px;
   }
 
+  .comentarios-section {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
   .comentarios-header {
     padding: 10px 12px;
     font-size: 12px;
+    flex-shrink: 0;
   }
 
   .comentarios-tabla-container {
     padding: 8px;
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   .comentarios-tabla {
