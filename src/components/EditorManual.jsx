@@ -413,7 +413,7 @@ const EditorManual = ({ usuario, esSuperAdmin, onDatosActualizados }) => {
             onChange={(e) => setFiltroCategoria(e.target.value)}
           >
             <option value="todas">Todas las categorías</option>
-            {categorias.map(cat => (
+            {todasCategorias.map(cat => (
               <option key={cat} value={cat}>{cat}</option>
             ))}
           </select>
