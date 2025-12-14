@@ -46,6 +46,8 @@ const EditorManual = ({ usuario, esSuperAdmin, onDatosActualizados }) => {
   const [vistaActiva, setVistaActiva] = useState('datos') // 'datos' | 'comentarios'
   const [comentarios, setComentarios] = useState([])
   const [cargandoComentarios, setCargandoComentarios] = useState(false)
+  const [paginaComentarios, setPaginaComentarios] = useState(1)
+  const COMENTARIOS_POR_PAGINA = 20
 
   useEffect(() => {
     cargarDatos()
@@ -68,14 +70,22 @@ const EditorManual = ({ usuario, esSuperAdmin, onDatosActualizados }) => {
     setCargandoComentarios(true)
     const filtros = {
       idMarca: esSuperAdmin ? null : usuario.id_marca,
-      limite: 100
+      limite: 500 // Traer más para paginar localmente
     }
     const resultado = await consultarComentarios(filtros)
     if (resultado.success) {
       setComentarios(resultado.data)
+      setPaginaComentarios(1) // Resetear a página 1
     }
     setCargandoComentarios(false)
   }
+
+  // Calcular comentarios paginados
+  const totalPaginasComentarios = Math.ceil(comentarios.length / COMENTARIOS_POR_PAGINA)
+  const comentariosPaginados = comentarios.slice(
+    (paginaComentarios - 1) * COMENTARIOS_POR_PAGINA,
+    paginaComentarios * COMENTARIOS_POR_PAGINA
+  )
 
   // Cargar comentarios cuando se cambia a esa vista
   useEffect(() => {
@@ -260,7 +270,7 @@ const EditorManual = ({ usuario, esSuperAdmin, onDatosActualizados }) => {
       {vistaActiva === 'comentarios' && (
         <div className="comentarios-section">
           <div className="comentarios-header">
-            <span>{comentarios.length} comentarios</span>
+            <span>{comentarios.length} comentarios totales</span>
             <button className="btn-refresh" onClick={cargarComentarios} title="Actualizar">
               ↻
             </button>
@@ -271,40 +281,65 @@ const EditorManual = ({ usuario, esSuperAdmin, onDatosActualizados }) => {
           ) : comentarios.length === 0 ? (
             <div className="editor-empty">No hay comentarios</div>
           ) : (
-            <div className="comentarios-tabla-container">
-              <table className="comentarios-tabla">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>Comentario Original</th>
-                    <th>Texto Publicacion</th>
-                    <th>Respuesta Comentario</th>
-                    <th>Mensaje Inbox</th>
-                    <th>Fecha</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {comentarios.map(c => (
-                    <tr key={c.id}>
-                      <td>{c.id}</td>
-                      <td title={c.comentario_original || ''}>
-                        {(c.comentario_original || '').substring(0, 40)}{(c.comentario_original || '').length > 40 ? '...' : ''}
-                      </td>
-                      <td title={c.texto_publicacion || ''}>
-                        {(c.texto_publicacion || '').substring(0, 40)}{(c.texto_publicacion || '').length > 40 ? '...' : ''}
-                      </td>
-                      <td title={c.respuesta_comentario || ''}>
-                        {(c.respuesta_comentario || '').substring(0, 40)}{(c.respuesta_comentario || '').length > 40 ? '...' : ''}
-                      </td>
-                      <td title={c.mensaje_inbox || ''}>
-                        {(c.mensaje_inbox || '').substring(0, 40)}{(c.mensaje_inbox || '').length > 40 ? '...' : ''}
-                      </td>
-                      <td>{c.creado_en ? new Date(c.creado_en).toLocaleDateString('es-CL') : '-'}</td>
+            <>
+              <div className="comentarios-tabla-container">
+                <table className="comentarios-tabla">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Comentario Original</th>
+                      <th>Texto Publicacion</th>
+                      <th>Respuesta Comentario</th>
+                      <th>Mensaje Inbox</th>
+                      <th>Fecha</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {comentariosPaginados.map(c => (
+                      <tr key={c.id}>
+                        <td>{c.id}</td>
+                        <td title={c.comentario_original || ''}>
+                          {(c.comentario_original || '').substring(0, 40)}{(c.comentario_original || '').length > 40 ? '...' : ''}
+                        </td>
+                        <td title={c.texto_publicacion || ''}>
+                          {(c.texto_publicacion || '').substring(0, 40)}{(c.texto_publicacion || '').length > 40 ? '...' : ''}
+                        </td>
+                        <td title={c.respuesta_comentario || ''}>
+                          {(c.respuesta_comentario || '').substring(0, 40)}{(c.respuesta_comentario || '').length > 40 ? '...' : ''}
+                        </td>
+                        <td title={c.mensaje_inbox || ''}>
+                          {(c.mensaje_inbox || '').substring(0, 40)}{(c.mensaje_inbox || '').length > 40 ? '...' : ''}
+                        </td>
+                        <td>{c.creado_en ? new Date(c.creado_en).toLocaleDateString('es-CL') : '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Controles de paginacion */}
+              {totalPaginasComentarios > 1 && (
+                <div className="paginacion-controles">
+                  <button
+                    className="btn-paginacion"
+                    onClick={() => setPaginaComentarios(p => Math.max(1, p - 1))}
+                    disabled={paginaComentarios === 1}
+                  >
+                    ← Anterior
+                  </button>
+                  <span className="paginacion-info">
+                    Página {paginaComentarios} de {totalPaginasComentarios}
+                  </span>
+                  <button
+                    className="btn-paginacion"
+                    onClick={() => setPaginaComentarios(p => Math.min(totalPaginasComentarios, p + 1))}
+                    disabled={paginaComentarios === totalPaginasComentarios}
+                  >
+                    Siguiente →
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       )}

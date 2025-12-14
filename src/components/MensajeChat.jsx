@@ -1,21 +1,41 @@
 import { useState } from 'react'
 import '../styles/MensajeChat.css'
 
+const FILAS_POR_PAGINA = 20
+
 const MensajeChat = ({ mensaje, onConfirmar, onCancelar, modoChatIA, onToggleModo, onRespuestaRapida }) => {
   const { rol, contenido, tipo, datos, tabla_preview, resumen, mostrarBotonModo } = mensaje
   const esUsuario = rol === 'user'
   const [respondido, setRespondido] = useState(false)
+  const [paginaTabla, setPaginaTabla] = useState(1)
 
   // ═══════════════════════════════════════════════════════════════
-  // RENDERIZAR TABLA
+  // RENDERIZAR TABLA CON PAGINACION
   // ═══════════════════════════════════════════════════════════════
-  
+
   const renderizarTabla = (tablaData, titulo = null) => {
     if (!tablaData || !tablaData.columnas || !tablaData.filas) return null
+
+    const totalFilas = tablaData.filas.length
+    const totalPaginas = Math.ceil(totalFilas / FILAS_POR_PAGINA)
+    const necesitaPaginacion = totalFilas > FILAS_POR_PAGINA
+
+    // Calcular filas a mostrar
+    const filasPaginadas = necesitaPaginacion
+      ? tablaData.filas.slice(
+          (paginaTabla - 1) * FILAS_POR_PAGINA,
+          paginaTabla * FILAS_POR_PAGINA
+        )
+      : tablaData.filas
 
     return (
       <div className="tabla-container">
         {titulo && <div className="tabla-titulo">{titulo}</div>}
+        {necesitaPaginacion && (
+          <div className="tabla-info-paginacion">
+            Mostrando {((paginaTabla - 1) * FILAS_POR_PAGINA) + 1}-{Math.min(paginaTabla * FILAS_POR_PAGINA, totalFilas)} de {totalFilas} registros
+          </div>
+        )}
         <div className="tabla-scroll">
           <table className="tabla-datos">
             <thead>
@@ -26,11 +46,11 @@ const MensajeChat = ({ mensaje, onConfirmar, onCancelar, modoChatIA, onToggleMod
               </tr>
             </thead>
             <tbody>
-              {tablaData.filas.map((fila, i) => (
+              {filasPaginadas.map((fila, i) => (
                 <tr key={i}>
                   {fila.map((celda, j) => (
                     <td key={j}>
-                      {celda === null || celda === undefined || celda === 'N/A' 
+                      {celda === null || celda === undefined || celda === 'N/A'
                         ? <span className="celda-vacia">—</span>
                         : String(celda)}
                     </td>
@@ -40,6 +60,29 @@ const MensajeChat = ({ mensaje, onConfirmar, onCancelar, modoChatIA, onToggleMod
             </tbody>
           </table>
         </div>
+
+        {/* Controles de paginacion */}
+        {necesitaPaginacion && (
+          <div className="paginacion-controles">
+            <button
+              className="btn-paginacion"
+              onClick={() => setPaginaTabla(p => Math.max(1, p - 1))}
+              disabled={paginaTabla === 1}
+            >
+              ← Anterior
+            </button>
+            <span className="paginacion-info">
+              Página {paginaTabla} de {totalPaginas}
+            </span>
+            <button
+              className="btn-paginacion"
+              onClick={() => setPaginaTabla(p => Math.min(totalPaginas, p + 1))}
+              disabled={paginaTabla === totalPaginas}
+            >
+              Siguiente →
+            </button>
+          </div>
+        )}
       </div>
     )
   }
