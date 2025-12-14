@@ -229,13 +229,15 @@ const Chat = () => {
         let mensajeResultado
         if (resultadoComentarios.success && resultadoComentarios.data.length > 0) {
           // Crear tabla con las columnas requeridas
-          const columnas = ['ID', 'Texto Publicacion', 'Respuesta Comentario', 'Mensaje Inbox', 'Fecha']
+          const columnas = ['ID', 'Comentario Original', 'Texto Publicacion', 'Respuesta Comentario', 'Mensaje Inbox', 'Fecha']
           const filas = resultadoComentarios.data.map(c => {
+            const comentarioOrig = c.comentario_original || ''
             const textoPubli = c.texto_publicacion || ''
             const respuesta = c.respuesta_comentario || ''
             const inbox = c.mensaje_inbox || ''
             return [
               c.id,
+              comentarioOrig.substring(0, 50) + (comentarioOrig.length > 50 ? '...' : '') || '—',
               textoPubli.substring(0, 50) + (textoPubli.length > 50 ? '...' : '') || '—',
               respuesta.substring(0, 50) + (respuesta.length > 50 ? '...' : '') || '—',
               inbox.substring(0, 50) + (inbox.length > 50 ? '...' : '') || '—',
