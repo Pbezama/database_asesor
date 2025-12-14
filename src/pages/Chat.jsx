@@ -627,6 +627,8 @@ const Chat = () => {
                 modoChatIA={modoChatIA}
                 onToggleModo={toggleModoChatIA}
                 onRespuestaRapida={handleRespuestaRapida}
+                nombreMarca={usuario.nombre_marca}
+                usuario={usuario}
               />
             ))}
 

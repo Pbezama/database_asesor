@@ -1,81 +1,310 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import {
   descargarCSV,
   descargarJSON,
   descargarExcel,
   descargarPDF,
-  descargarHTML
+  descargarHTML,
+  filtrarPorFechas
 } from '../services/downloadService'
+import {
+  analizarComentarios,
+  analizarDatosMarca,
+  generarInformePDF,
+  descargarInformeTexto
+} from '../services/analysisService'
 import '../styles/MensajeChat.css'
 
-const FILAS_POR_PAGINA = 20
-
-const MensajeChat = ({ mensaje, onConfirmar, onCancelar, modoChatIA, onToggleModo, onRespuestaRapida }) => {
+const MensajeChat = ({
+  mensaje,
+  onConfirmar,
+  onCancelar,
+  modoChatIA,
+  onToggleModo,
+  onRespuestaRapida,
+  nombreMarca = '',
+  usuario = null
+}) => {
   const { rol, contenido, tipo, datos, tabla_preview, resumen, mostrarBotonModo } = mensaje
   const esUsuario = rol === 'user'
   const [respondido, setRespondido] = useState(false)
+
+  // Estados para tabla avanzada
   const [paginaTabla, setPaginaTabla] = useState(1)
+  const [filasPorPagina, setFilasPorPagina] = useState(20)
+  const [ordenColumna, setOrdenColumna] = useState(null)
+  const [ordenDireccion, setOrdenDireccion] = useState('desc')
+  const [filtroTexto, setFiltroTexto] = useState('')
+  const [filtroId, setFiltroId] = useState('')
+  const [fechaDesde, setFechaDesde] = useState('')
+  const [fechaHasta, setFechaHasta] = useState('')
+  const [mostrarFiltros, setMostrarFiltros] = useState(false)
+
+  // Estados para menú de descarga y análisis
   const [menuDescargaAbierto, setMenuDescargaAbierto] = useState(false)
+  const [modalAnalisis, setModalAnalisis] = useState(false)
+  const [analizando, setAnalizando] = useState(false)
+  const [resultadoAnalisis, setResultadoAnalisis] = useState(null)
+  const [errorAnalisis, setErrorAnalisis] = useState(null)
 
-  // Función para descargar tabla
-  const descargarTabla = (formato, tablaData) => {
-    if (!tablaData || !tablaData.columnas || !tablaData.filas) return
+  // ═══════════════════════════════════════════════════════════════
+  // PROCESAR DATOS DE TABLA
+  // ═══════════════════════════════════════════════════════════════
 
-    // Convertir filas a objetos
-    const datosObj = tablaData.filas.map(fila => {
-      const obj = {}
+  const procesarDatosTabla = (tablaData) => {
+    if (!tablaData || !tablaData.columnas || !tablaData.filas) return { filas: [], total: 0 }
+
+    // Convertir filas a objetos para facilitar el procesamiento
+    let filasObj = tablaData.filas.map((fila, idx) => {
+      const obj = { _index: idx }
       tablaData.columnas.forEach((col, i) => {
         obj[col] = fila[i]
       })
       return obj
     })
 
-    const nombreArchivo = `datos_${new Date().toISOString().split('T')[0]}`
+    // Filtrar por ID
+    if (filtroId) {
+      const idBuscar = filtroId.toLowerCase()
+      filasObj = filasObj.filter(f => {
+        const id = String(f['ID'] || f['id'] || '').toLowerCase()
+        return id.includes(idBuscar)
+      })
+    }
+
+    // Filtrar por texto
+    if (filtroTexto) {
+      const textoBuscar = filtroTexto.toLowerCase()
+      filasObj = filasObj.filter(f => {
+        return Object.values(f).some(val =>
+          String(val || '').toLowerCase().includes(textoBuscar)
+        )
+      })
+    }
+
+    // Filtrar por fecha
+    if (fechaDesde || fechaHasta) {
+      const colFecha = tablaData.columnas.find(c =>
+        c.toLowerCase().includes('fecha') || c.toLowerCase() === 'creado_en'
+      )
+      if (colFecha) {
+        filasObj = filasObj.filter(f => {
+          const fechaVal = f[colFecha]
+          if (!fechaVal || fechaVal === '—') return false
+
+          // Intentar parsear la fecha
+          let fecha
+          if (typeof fechaVal === 'string' && fechaVal.includes('/')) {
+            // Formato dd/mm/yyyy
+            const partes = fechaVal.split(/[\/\s,]/)
+            fecha = new Date(partes[2], partes[1] - 1, partes[0])
+          } else {
+            fecha = new Date(fechaVal)
+          }
+
+          if (isNaN(fecha.getTime())) return true
+
+          if (fechaDesde && fecha < new Date(fechaDesde)) return false
+          if (fechaHasta && fecha > new Date(fechaHasta + 'T23:59:59')) return false
+          return true
+        })
+      }
+    }
+
+    // Ordenar
+    if (ordenColumna) {
+      filasObj.sort((a, b) => {
+        let valorA = a[ordenColumna]
+        let valorB = b[ordenColumna]
+
+        // Manejar valores nulos
+        if (valorA === '—' || valorA === null || valorA === undefined) valorA = ''
+        if (valorB === '—' || valorB === null || valorB === undefined) valorB = ''
+
+        // Detectar si es número
+        const numA = parseFloat(String(valorA).replace(/[^\d.-]/g, ''))
+        const numB = parseFloat(String(valorB).replace(/[^\d.-]/g, ''))
+
+        if (!isNaN(numA) && !isNaN(numB)) {
+          return ordenDireccion === 'asc' ? numA - numB : numB - numA
+        }
+
+        // Ordenar como string
+        const strA = String(valorA).toLowerCase()
+        const strB = String(valorB).toLowerCase()
+
+        if (strA < strB) return ordenDireccion === 'asc' ? -1 : 1
+        if (strA > strB) return ordenDireccion === 'asc' ? 1 : -1
+        return 0
+      })
+    }
+
+    return { filasObj, total: filasObj.length }
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // FUNCIONES DE DESCARGA
+  // ═══════════════════════════════════════════════════════════════
+
+  const descargarTabla = (formato, tablaData, filasObj) => {
+    if (!tablaData || !filasObj || filasObj.length === 0) return
+
+    // Usar las filas filtradas/ordenadas
+    const datosParaDescargar = filasObj.map(f => {
+      const obj = {}
+      tablaData.columnas.forEach(col => {
+        obj[col] = f[col]
+      })
+      return obj
+    })
+
+    const nombreArchivo = `${nombreMarca || 'datos'}_${new Date().toISOString().split('T')[0]}`
+    const titulo = `Datos - ${nombreMarca || 'Exportación'}`
 
     switch (formato) {
       case 'csv':
-        descargarCSV(datosObj, tablaData.columnas, nombreArchivo)
+        descargarCSV(datosParaDescargar, tablaData.columnas, nombreArchivo)
         break
       case 'json':
-        descargarJSON(datosObj, nombreArchivo)
+        descargarJSON(datosParaDescargar, nombreArchivo)
         break
       case 'excel':
-        descargarExcel(datosObj, tablaData.columnas, nombreArchivo)
+        descargarExcel(datosParaDescargar, tablaData.columnas, nombreArchivo)
         break
       case 'pdf':
-        descargarPDF(datosObj, tablaData.columnas, nombreArchivo, 'Datos del Chat')
+        descargarPDF(datosParaDescargar, tablaData.columnas, nombreArchivo, titulo)
         break
       case 'html':
-        descargarHTML(datosObj, tablaData.columnas, nombreArchivo, 'Datos del Chat')
+        descargarHTML(datosParaDescargar, tablaData.columnas, nombreArchivo, titulo)
         break
     }
     setMenuDescargaAbierto(false)
   }
 
   // ═══════════════════════════════════════════════════════════════
-  // RENDERIZAR TABLA CON PAGINACION
+  // ANÁLISIS CON IA
+  // ═══════════════════════════════════════════════════════════════
+
+  const ejecutarAnalisis = async (tablaData, filasObj) => {
+    setAnalizando(true)
+    setErrorAnalisis(null)
+    setResultadoAnalisis(null)
+
+    try {
+      // Convertir filas a formato para análisis
+      const datosParaAnalizar = filasObj.map(f => {
+        const obj = {}
+        tablaData.columnas.forEach(col => {
+          // Mapear nombres de columnas a campos
+          if (col === 'ID') obj.id = f[col]
+          else if (col.toLowerCase().includes('comentario')) obj.comentario_original = f[col]
+          else if (col.toLowerCase().includes('texto')) obj.texto_publicacion = f[col]
+          else if (col.toLowerCase().includes('respuesta')) obj.respuesta_comentario = f[col]
+          else if (col.toLowerCase().includes('inbox')) obj.mensaje_inbox = f[col]
+          else if (col.toLowerCase().includes('fecha')) obj.creado_en = f[col]
+          else obj[col.toLowerCase().replace(/\s+/g, '_')] = f[col]
+        })
+        return obj
+      })
+
+      // Detectar si es tabla de comentarios o datos
+      const esComentarios = tablaData.columnas.some(c =>
+        c.toLowerCase().includes('comentario') ||
+        c.toLowerCase().includes('inbox') ||
+        c.toLowerCase().includes('respuesta')
+      )
+
+      let resultado
+      if (esComentarios) {
+        resultado = await analizarComentarios(datosParaAnalizar, nombreMarca)
+      } else {
+        resultado = await analizarDatosMarca(datosParaAnalizar, nombreMarca)
+      }
+
+      if (resultado.success) {
+        setResultadoAnalisis({ ...resultado, tipo: esComentarios ? 'comentarios' : 'marca' })
+      } else {
+        setErrorAnalisis(resultado.error)
+      }
+    } catch (error) {
+      setErrorAnalisis(error.message)
+    }
+
+    setAnalizando(false)
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // CAMBIAR ORDEN
+  // ═══════════════════════════════════════════════════════════════
+
+  const cambiarOrden = (columna) => {
+    if (ordenColumna === columna) {
+      setOrdenDireccion(ordenDireccion === 'asc' ? 'desc' : 'asc')
+    } else {
+      setOrdenColumna(columna)
+      setOrdenDireccion('desc')
+    }
+    setPaginaTabla(1)
+  }
+
+  const iconoOrden = (columna) => {
+    if (ordenColumna !== columna) return ''
+    return ordenDireccion === 'asc' ? ' ↑' : ' ↓'
+  }
+
+  // Limpiar filtros
+  const limpiarFiltros = () => {
+    setFiltroTexto('')
+    setFiltroId('')
+    setFechaDesde('')
+    setFechaHasta('')
+    setPaginaTabla(1)
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // RENDERIZAR TABLA CON TODAS LAS FUNCIONALIDADES
   // ═══════════════════════════════════════════════════════════════
 
   const renderizarTabla = (tablaData, titulo = null) => {
     if (!tablaData || !tablaData.columnas || !tablaData.filas) return null
 
-    const totalFilas = tablaData.filas.length
-    const totalPaginas = Math.ceil(totalFilas / FILAS_POR_PAGINA)
-    const necesitaPaginacion = totalFilas > FILAS_POR_PAGINA
+    const { filasObj, total } = procesarDatosTabla(tablaData)
+    const totalPaginas = Math.ceil(filasObj.length / filasPorPagina)
+    const necesitaPaginacion = filasObj.length > filasPorPagina
 
-    // Calcular filas a mostrar
-    const filasPaginadas = necesitaPaginacion
-      ? tablaData.filas.slice(
-          (paginaTabla - 1) * FILAS_POR_PAGINA,
-          paginaTabla * FILAS_POR_PAGINA
-        )
-      : tablaData.filas
+    // Paginar
+    const filasPaginadas = filasObj.slice(
+      (paginaTabla - 1) * filasPorPagina,
+      paginaTabla * filasPorPagina
+    )
+
+    // Detectar si tiene columna de fecha
+    const tieneFecha = tablaData.columnas.some(c =>
+      c.toLowerCase().includes('fecha') || c.toLowerCase() === 'creado_en'
+    )
+
+    // Detectar si tiene columna ID
+    const tieneId = tablaData.columnas.some(c =>
+      c.toLowerCase() === 'id'
+    )
+
+    const hayFiltrosActivos = filtroTexto || filtroId || fechaDesde || fechaHasta
 
     return (
-      <div className="tabla-container">
+      <div className="tabla-container tabla-avanzada">
+        {/* Header con título y botones */}
         <div className="tabla-header-acciones">
-          {titulo && <div className="tabla-titulo">{titulo}</div>}
-          {totalFilas > 0 && (
+          <div className="tabla-header-izq">
+            {titulo && <div className="tabla-titulo">{titulo}</div>}
+            <span className="tabla-contador">{filasObj.length} registros</span>
+          </div>
+          <div className="tabla-header-der">
+            <button
+              className={`btn-filtros-tabla ${mostrarFiltros ? 'activo' : ''}`}
+              onClick={() => setMostrarFiltros(!mostrarFiltros)}
+            >
+              ⚙ Filtros
+            </button>
             <div className="tabla-descarga-container">
               <button
                 className="btn-descarga-tabla"
@@ -87,48 +316,162 @@ const MensajeChat = ({ mensaje, onConfirmar, onCancelar, modoChatIA, onToggleMod
                 <>
                   <div className="menu-descarga-overlay" onClick={() => setMenuDescargaAbierto(false)} />
                   <div className="menu-descarga-tabla">
-                    <button onClick={() => descargarTabla('csv', tablaData)}>📄 CSV</button>
-                    <button onClick={() => descargarTabla('excel', tablaData)}>📊 Excel</button>
-                    <button onClick={() => descargarTabla('json', tablaData)}>{ } JSON</button>
-                    <button onClick={() => descargarTabla('pdf', tablaData)}>📕 PDF</button>
-                    <button onClick={() => descargarTabla('html', tablaData)}>🌐 HTML</button>
+                    <div className="menu-seccion-titulo">Exportar datos</div>
+                    <button onClick={() => descargarTabla('csv', tablaData, filasObj)}>📄 CSV</button>
+                    <button onClick={() => descargarTabla('excel', tablaData, filasObj)}>📊 Excel</button>
+                    <button onClick={() => descargarTabla('json', tablaData, filasObj)}>{ } JSON</button>
+                    <button onClick={() => descargarTabla('pdf', tablaData, filasObj)}>📕 PDF</button>
+                    <button onClick={() => descargarTabla('html', tablaData, filasObj)}>🌐 HTML</button>
+                    {nombreMarca && (
+                      <>
+                        <div className="menu-seccion-titulo">Análisis IA</div>
+                        <button
+                          className="btn-analisis-menu"
+                          onClick={() => {
+                            setMenuDescargaAbierto(false)
+                            setModalAnalisis(true)
+                          }}
+                        >
+                          🤖 Generar Informe IA
+                        </button>
+                      </>
+                    )}
                   </div>
                 </>
               )}
             </div>
-          )}
+          </div>
         </div>
-        {necesitaPaginacion && (
-          <div className="tabla-info-paginacion">
-            Mostrando {((paginaTabla - 1) * FILAS_POR_PAGINA) + 1}-{Math.min(paginaTabla * FILAS_POR_PAGINA, totalFilas)} de {totalFilas} registros
+
+        {/* Panel de filtros */}
+        {mostrarFiltros && (
+          <div className="tabla-filtros-panel">
+            <div className="filtros-grid">
+              {tieneId && (
+                <div className="filtro-grupo">
+                  <label>Filtrar por ID</label>
+                  <input
+                    type="text"
+                    placeholder="Ej: 123"
+                    value={filtroId}
+                    onChange={(e) => {
+                      setFiltroId(e.target.value)
+                      setPaginaTabla(1)
+                    }}
+                  />
+                </div>
+              )}
+              <div className="filtro-grupo filtro-texto">
+                <label>Buscar en texto</label>
+                <input
+                  type="text"
+                  placeholder="Buscar..."
+                  value={filtroTexto}
+                  onChange={(e) => {
+                    setFiltroTexto(e.target.value)
+                    setPaginaTabla(1)
+                  }}
+                />
+              </div>
+              {tieneFecha && (
+                <>
+                  <div className="filtro-grupo">
+                    <label>Desde</label>
+                    <input
+                      type="date"
+                      value={fechaDesde}
+                      onChange={(e) => {
+                        setFechaDesde(e.target.value)
+                        setPaginaTabla(1)
+                      }}
+                    />
+                  </div>
+                  <div className="filtro-grupo">
+                    <label>Hasta</label>
+                    <input
+                      type="date"
+                      value={fechaHasta}
+                      onChange={(e) => {
+                        setFechaHasta(e.target.value)
+                        setPaginaTabla(1)
+                      }}
+                    />
+                  </div>
+                </>
+              )}
+              <div className="filtro-grupo">
+                <label>Filas por página</label>
+                <select
+                  value={filasPorPagina}
+                  onChange={(e) => {
+                    setFilasPorPagina(Number(e.target.value))
+                    setPaginaTabla(1)
+                  }}
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                </select>
+              </div>
+            </div>
+            {hayFiltrosActivos && (
+              <button className="btn-limpiar-filtros" onClick={limpiarFiltros}>
+                ✕ Limpiar filtros
+              </button>
+            )}
           </div>
         )}
+
+        {/* Info de paginación */}
+        {filasObj.length > 0 && (
+          <div className="tabla-info-paginacion">
+            Mostrando {((paginaTabla - 1) * filasPorPagina) + 1}-{Math.min(paginaTabla * filasPorPagina, filasObj.length)} de {filasObj.length}
+            {hayFiltrosActivos && ` (filtrado de ${tablaData.filas.length} totales)`}
+          </div>
+        )}
+
+        {/* Tabla */}
         <div className="tabla-scroll">
           <table className="tabla-datos">
             <thead>
               <tr>
                 {tablaData.columnas.map((col, i) => (
-                  <th key={i}>{col}</th>
+                  <th
+                    key={i}
+                    className="th-ordenable"
+                    onClick={() => cambiarOrden(col)}
+                  >
+                    {col}{iconoOrden(col)}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filasPaginadas.map((fila, i) => (
-                <tr key={i}>
-                  {fila.map((celda, j) => (
-                    <td key={j}>
-                      {celda === null || celda === undefined || celda === 'N/A'
-                        ? <span className="celda-vacia">—</span>
-                        : String(celda)}
-                    </td>
-                  ))}
+              {filasPaginadas.length === 0 ? (
+                <tr>
+                  <td colSpan={tablaData.columnas.length} className="celda-vacia-mensaje">
+                    No hay datos que coincidan con los filtros
+                  </td>
                 </tr>
-              ))}
+              ) : (
+                filasPaginadas.map((fila, i) => (
+                  <tr key={fila._index}>
+                    {tablaData.columnas.map((col, j) => (
+                      <td key={j}>
+                        {fila[col] === null || fila[col] === undefined || fila[col] === 'N/A' || fila[col] === ''
+                          ? <span className="celda-vacia">—</span>
+                          : String(fila[col])}
+                      </td>
+                    ))}
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
 
-        {/* Controles de paginacion */}
+        {/* Controles de paginación */}
         {necesitaPaginacion && (
           <div className="paginacion-controles">
             <button
@@ -139,15 +482,92 @@ const MensajeChat = ({ mensaje, onConfirmar, onCancelar, modoChatIA, onToggleMod
               ← Anterior
             </button>
             <span className="paginacion-info">
-              Página {paginaTabla} de {totalPaginas}
+              Página {paginaTabla} de {totalPaginas || 1}
             </span>
             <button
               className="btn-paginacion"
               onClick={() => setPaginaTabla(p => Math.min(totalPaginas, p + 1))}
-              disabled={paginaTabla === totalPaginas}
+              disabled={paginaTabla >= totalPaginas}
             >
               Siguiente →
             </button>
+          </div>
+        )}
+
+        {/* Modal de análisis IA */}
+        {modalAnalisis && (
+          <div className="modal-overlay-chat" onClick={() => setModalAnalisis(false)}>
+            <div className="modal-analisis-chat" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>Análisis con IA</h3>
+                <button className="btn-cerrar-modal" onClick={() => setModalAnalisis(false)}>✕</button>
+              </div>
+              <div className="modal-body">
+                {!resultadoAnalisis && !analizando && !errorAnalisis && (
+                  <div className="analisis-inicio">
+                    <div className="analisis-icono">🤖</div>
+                    <p>
+                      Se analizarán {filasObj.length} registros para generar un informe
+                      detallado con recomendaciones y puntuaciones.
+                    </p>
+                    <button
+                      className="btn-iniciar-analisis"
+                      onClick={() => ejecutarAnalisis(tablaData, filasObj)}
+                    >
+                      Iniciar Análisis
+                    </button>
+                  </div>
+                )}
+
+                {analizando && (
+                  <div className="analisis-cargando">
+                    <div className="spinner"></div>
+                    <p>Analizando datos...</p>
+                    <p className="texto-secundario">Esto puede tomar unos segundos</p>
+                  </div>
+                )}
+
+                {errorAnalisis && (
+                  <div className="analisis-error">
+                    <div className="error-icono">✕</div>
+                    <p>Error al generar el análisis</p>
+                    <p className="texto-secundario">{errorAnalisis}</p>
+                    <button
+                      className="btn-reintentar"
+                      onClick={() => ejecutarAnalisis(tablaData, filasObj)}
+                    >
+                      Reintentar
+                    </button>
+                  </div>
+                )}
+
+                {resultadoAnalisis && (
+                  <div className="analisis-resultado">
+                    <div className="resultado-exito">
+                      <span className="exito-icono">✓</span>
+                      Análisis completado
+                    </div>
+                    <div className="resultado-preview">
+                      <pre>{resultadoAnalisis.informe.substring(0, 500)}...</pre>
+                    </div>
+                    <div className="resultado-acciones">
+                      <button
+                        className="btn-descargar-informe"
+                        onClick={() => generarInformePDF(resultadoAnalisis, resultadoAnalisis.tipo)}
+                      >
+                        📕 Ver/Imprimir PDF
+                      </button>
+                      <button
+                        className="btn-descargar-texto"
+                        onClick={() => descargarInformeTexto(resultadoAnalisis, resultadoAnalisis.tipo)}
+                      >
+                        📄 Descargar TXT
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -207,12 +627,10 @@ const MensajeChat = ({ mensaje, onConfirmar, onCancelar, modoChatIA, onToggleMod
   // ═══════════════════════════════════════════════════════════════
 
   const renderizarContenido = () => {
-    // Si es mensaje de usuario, solo mostrar texto
     if (esUsuario) {
       return <div className="mensaje-texto">{contenido}</div>
     }
 
-    // Según el tipo de respuesta
     switch (tipo) {
       case 'tabla':
         return (
@@ -235,6 +653,7 @@ const MensajeChat = ({ mensaje, onConfirmar, onCancelar, modoChatIA, onToggleMod
           <div className="mensaje-exito">
             <span className="exito-icon">✓</span>
             <div className="exito-texto">{contenido}</div>
+            {datos && renderizarTabla(datos)}
           </div>
         )
 
@@ -256,7 +675,6 @@ const MensajeChat = ({ mensaje, onConfirmar, onCancelar, modoChatIA, onToggleMod
 
       case 'texto':
       default:
-        // Procesar markdown básico para el texto
         return (
           <div className="mensaje-texto">{procesarTexto(contenido)}</div>
         )
@@ -269,12 +687,10 @@ const MensajeChat = ({ mensaje, onConfirmar, onCancelar, modoChatIA, onToggleMod
 
   const procesarTexto = (texto) => {
     if (!texto) return null
-    
-    // Convertir **texto** a negrita y dividir por saltos de línea
+
     const lineas = texto.split('\n')
-    
+
     return lineas.map((linea, i) => {
-      // Procesar negritas
       const partes = linea.split(/(\*\*[^*]+\*\*)/g)
       const contenidoLinea = partes.map((parte, j) => {
         if (parte.startsWith('**') && parte.endsWith('**')) {
