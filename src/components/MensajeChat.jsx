@@ -42,6 +42,10 @@ const MensajeChat = ({
 
   // Estados para menú de descarga y análisis
   const [menuDescargaAbierto, setMenuDescargaAbierto] = useState(false)
+  const [modalFechasDescarga, setModalFechasDescarga] = useState(false)
+  const [formatoDescargaPendiente, setFormatoDescargaPendiente] = useState(null)
+  const [fechaDescargaDesde, setFechaDescargaDesde] = useState('')
+  const [fechaDescargaHasta, setFechaDescargaHasta] = useState('')
   const [modalAnalisis, setModalAnalisis] = useState(false)
   const [analizando, setAnalizando] = useState(false)
   const [resultadoAnalisis, setResultadoAnalisis] = useState(null)
@@ -146,6 +150,66 @@ const MensajeChat = ({
   // FUNCIONES DE DESCARGA
   // ═══════════════════════════════════════════════════════════════
 
+  // Abrir modal de fechas antes de descargar
+  const abrirModalFechasDescarga = (formato) => {
+    setFormatoDescargaPendiente(formato)
+    setFechaDescargaDesde('')
+    setFechaDescargaHasta('')
+    setModalFechasDescarga(true)
+    setMenuDescargaAbierto(false)
+  }
+
+  // Filtrar datos por fechas de descarga
+  const filtrarDatosPorFechasDescarga = (filasObj, tablaData) => {
+    if (!fechaDescargaDesde && !fechaDescargaHasta) return filasObj
+
+    const colFecha = tablaData.columnas.find(c =>
+      c.toLowerCase().includes('fecha') || c.toLowerCase() === 'creado_en'
+    )
+    if (!colFecha) return filasObj
+
+    return filasObj.filter(f => {
+      const fechaVal = f[colFecha]
+      if (!fechaVal || fechaVal === '—') return false
+
+      let fecha
+      if (typeof fechaVal === 'string' && fechaVal.includes('/')) {
+        const partes = fechaVal.split(/[\/\s,]/)
+        fecha = new Date(partes[2], partes[1] - 1, partes[0])
+      } else {
+        fecha = new Date(fechaVal)
+      }
+
+      if (isNaN(fecha.getTime())) return true
+
+      if (fechaDescargaDesde && fecha < new Date(fechaDescargaDesde)) return false
+      if (fechaDescargaHasta && fecha > new Date(fechaDescargaHasta + 'T23:59:59')) return false
+      return true
+    })
+  }
+
+  // Contar registros con filtro de fecha
+  const contarRegistrosFechaDescarga = (tablaData) => {
+    if (!tablaData || !tablaData.filas) return 0
+    const { filasObj } = procesarDatosTabla(tablaData)
+    return filtrarDatosPorFechasDescarga(filasObj, tablaData).length
+  }
+
+  // Ejecutar descarga con fechas seleccionadas
+  const ejecutarDescargaConFechas = (tablaData) => {
+    const { filasObj } = procesarDatosTabla(tablaData)
+    const filasFiltradas = filtrarDatosPorFechasDescarga(filasObj, tablaData)
+
+    if (filasFiltradas.length === 0) {
+      alert('No hay datos en el rango de fechas seleccionado')
+      return
+    }
+
+    descargarTabla(formatoDescargaPendiente, tablaData, filasFiltradas)
+    setModalFechasDescarga(false)
+    setFormatoDescargaPendiente(null)
+  }
+
   const descargarTabla = (formato, tablaData, filasObj) => {
     if (!tablaData || !filasObj || filasObj.length === 0) return
 
@@ -158,7 +222,10 @@ const MensajeChat = ({
       return obj
     })
 
-    const nombreArchivo = `${nombreMarca || 'datos'}_${new Date().toISOString().split('T')[0]}`
+    const fechaSufijo = fechaDescargaDesde || fechaDescargaHasta
+      ? `_${fechaDescargaDesde || 'inicio'}_${fechaDescargaHasta || 'fin'}`
+      : `_${new Date().toISOString().split('T')[0]}`
+    const nombreArchivo = `${nombreMarca || 'datos'}${fechaSufijo}`
     const titulo = `Datos - ${nombreMarca || 'Exportación'}`
 
     switch (formato) {
@@ -317,11 +384,11 @@ const MensajeChat = ({
                   <div className="menu-descarga-overlay" onClick={() => setMenuDescargaAbierto(false)} />
                   <div className="menu-descarga-tabla">
                     <div className="menu-seccion-titulo">Exportar datos</div>
-                    <button onClick={() => descargarTabla('csv', tablaData, filasObj)}>📄 CSV</button>
-                    <button onClick={() => descargarTabla('excel', tablaData, filasObj)}>📊 Excel</button>
-                    <button onClick={() => descargarTabla('json', tablaData, filasObj)}>{ } JSON</button>
-                    <button onClick={() => descargarTabla('pdf', tablaData, filasObj)}>📕 PDF</button>
-                    <button onClick={() => descargarTabla('html', tablaData, filasObj)}>🌐 HTML</button>
+                    <button onClick={() => abrirModalFechasDescarga('csv')}>📄 CSV</button>
+                    <button onClick={() => abrirModalFechasDescarga('excel')}>📊 Excel</button>
+                    <button onClick={() => abrirModalFechasDescarga('json')}>{ } JSON</button>
+                    <button onClick={() => abrirModalFechasDescarga('pdf')}>📕 PDF</button>
+                    <button onClick={() => abrirModalFechasDescarga('html')}>🌐 HTML</button>
                     {nombreMarca && (
                       <>
                         <div className="menu-seccion-titulo">Análisis IA</div>
@@ -329,6 +396,8 @@ const MensajeChat = ({
                           className="btn-analisis-menu"
                           onClick={() => {
                             setMenuDescargaAbierto(false)
+                            setFechaDescargaDesde('')
+                            setFechaDescargaHasta('')
                             setModalAnalisis(true)
                           }}
                         >
@@ -566,6 +635,66 @@ const MensajeChat = ({
                     </div>
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal de selección de fechas para descarga */}
+        {modalFechasDescarga && (
+          <div className="modal-overlay-chat" onClick={() => setModalFechasDescarga(false)}>
+            <div className="modal-fechas-descarga" onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>Seleccionar Rango de Fechas</h3>
+                <button
+                  className="btn-cerrar-modal"
+                  onClick={() => setModalFechasDescarga(false)}
+                >
+                  ✕
+                </button>
+              </div>
+              <div className="modal-body">
+                <p className="modal-descripcion">
+                  Selecciona el rango de fechas para descargar.
+                  Deja vacío para incluir todos los registros.
+                </p>
+                <div className="fechas-grid">
+                  <div className="fecha-grupo">
+                    <label>Desde</label>
+                    <input
+                      type="date"
+                      value={fechaDescargaDesde}
+                      onChange={(e) => setFechaDescargaDesde(e.target.value)}
+                    />
+                  </div>
+                  <div className="fecha-grupo">
+                    <label>Hasta</label>
+                    <input
+                      type="date"
+                      value={fechaDescargaHasta}
+                      onChange={(e) => setFechaDescargaHasta(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="modal-info">
+                  <span className="info-icon">ℹ</span>
+                  {contarRegistrosFechaDescarga(tablaData)} registros seleccionados
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button
+                  className="btn-cancelar"
+                  onClick={() => setModalFechasDescarga(false)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className="btn-continuar"
+                  onClick={() => ejecutarDescargaConFechas(tablaData)}
+                  disabled={contarRegistrosFechaDescarga(tablaData) === 0}
+                >
+                  Descargar {formatoDescargaPendiente?.toUpperCase()}
+                </button>
               </div>
             </div>
           </div>

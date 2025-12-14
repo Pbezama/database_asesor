@@ -602,6 +602,161 @@
   background: #e2e8f0;
 }
 
+/* ═══════════════════════════════════════════════════════════════
+   MODAL DE SELECCIÓN DE FECHAS PARA DESCARGA
+   ═══════════════════════════════════════════════════════════════ */
+
+.modal-fechas-descarga {
+  background: #ffffff;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: modalEntrar 0.2s ease-out;
+}
+
+.modal-fechas-descarga .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 20px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.modal-fechas-descarga .modal-header h3 {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.modal-fechas-descarga .btn-cerrar-modal {
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: #f1f5f9;
+  color: #64748b;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: all 0.2s ease;
+}
+
+.modal-fechas-descarga .btn-cerrar-modal:hover {
+  background: #fee2e2;
+  color: #dc2626;
+}
+
+.modal-fechas-descarga .modal-body {
+  padding: 20px;
+}
+
+.modal-descripcion {
+  color: #64748b;
+  font-size: 14px;
+  margin: 0 0 18px;
+  line-height: 1.5;
+}
+
+.fechas-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.fecha-grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.fecha-grupo label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #475569;
+}
+
+.fecha-grupo input {
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #1e293b;
+  transition: all 0.2s ease;
+}
+
+.fecha-grupo input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.modal-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 12px;
+  background: #f0f9ff;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #0369a1;
+}
+
+.info-icon {
+  font-size: 16px;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px;
+  border-top: 1px solid #e2e8f0;
+  background: #f8fafc;
+  border-radius: 0 0 16px 16px;
+}
+
+.btn-cancelar {
+  padding: 10px 18px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #64748b;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-cancelar:hover {
+  background: #f1f5f9;
+  color: #475569;
+}
+
+.btn-continuar {
+  padding: 10px 20px;
+  border: none;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.btn-continuar:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
+}
+
+.btn-continuar:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .tabla-scroll {
   overflow-x: auto;
   scrollbar-width: thin;
@@ -1219,5 +1374,55 @@
   .btn-descargar-texto {
     padding: 10px 12px;
     font-size: 12px;
+  }
+
+  /* Modal fechas movil */
+  .modal-fechas-descarga {
+    border-radius: 16px 16px 0 0;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+
+  .modal-fechas-descarga .modal-header {
+    padding: 14px 16px;
+  }
+
+  .modal-fechas-descarga .modal-header h3 {
+    font-size: 15px;
+  }
+
+  .modal-fechas-descarga .modal-body {
+    padding: 16px;
+  }
+
+  .modal-descripcion {
+    font-size: 13px;
+    margin-bottom: 14px;
+  }
+
+  .fechas-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .fecha-grupo input {
+    padding: 9px 10px;
+    font-size: 13px;
+  }
+
+  .modal-info {
+    padding: 10px;
+    font-size: 12px;
+  }
+
+  .modal-footer {
+    padding: 12px 16px;
+    gap: 8px;
+  }
+
+  .btn-cancelar,
+  .btn-continuar {
+    padding: 10px 14px;
+    font-size: 13px;
   }
 }
