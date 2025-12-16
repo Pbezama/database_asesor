@@ -24,13 +24,16 @@ const Chat = () => {
   const [accionPendiente, setAccionPendiente] = useState(null)
   const [mostrarEditor, setMostrarEditor] = useState(true)
   const [modoChatIA, setModoChatIA] = useState(false)
-  // Estado para navegacion movil: 'chat' | 'editor' | 'chatia'
+  // Estado para navegacion movil: 'chat' | 'editor'
   const [vistaMobile, setVistaMobile] = useState('chat')
+  // Estado para el menu desplegable del input
+  const [menuInputAbierto, setMenuInputAbierto] = useState(false)
 
   const { usuario, logout, sesionChatId, mensajesCount, incrementarMensajes, reiniciarChat, esSuperAdmin } = useAuth()
   const navigate = useNavigate()
   const chatEndRef = useRef(null)
   const inputRef = useRef(null)
+  const menuInputRef = useRef(null)
 
   useEffect(() => {
     if (!usuario) {
@@ -44,6 +47,25 @@ const Chat = () => {
   useEffect(() => {
     scrollToBottom()
   }, [mensajes])
+
+  // Cerrar menu al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (menuInputRef.current && !menuInputRef.current.contains(event.target)) {
+        setMenuInputAbierto(false)
+      }
+    }
+
+    if (menuInputAbierto) {
+      document.addEventListener('mousedown', handleClickOutside)
+      document.addEventListener('touchstart', handleClickOutside)
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside)
+      document.removeEventListener('touchstart', handleClickOutside)
+    }
+  }, [menuInputAbierto])
 
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -99,23 +121,23 @@ const Chat = () => {
     }
   }
 
-  // Funcion para cambiar vista en movil
+  // Funcion para cambiar vista en movil (solo chat/editor ahora)
   const cambiarVistaMobile = (vista) => {
     setVistaMobile(vista)
-    if (vista === 'chatia') {
-      if (!modoChatIA) {
-        setModoChatIA(true)
-        setMensajes([])
-        setAccionPendiente(null)
-        agregarMensajeBienvenidaChatIA()
-      }
-    } else if (vista === 'chat' || vista === 'editor') {
-      if (modoChatIA) {
-        setModoChatIA(false)
-        setMensajes([])
-        setAccionPendiente(null)
-        agregarMensajeBienvenida()
-      }
+  }
+
+  // Manejar acciones del menu de input
+  const handleMenuInputAction = (accion) => {
+    setMenuInputAbierto(false)
+    switch (accion) {
+      case 'toggle-modo':
+        toggleModoChatIA()
+        break
+      case 'reiniciar':
+        handleReiniciarChat()
+        break
+      default:
+        break
     }
   }
 
@@ -652,12 +674,52 @@ const Chat = () => {
               {20 - mensajesCount} mensajes restantes
             </div>
             <form onSubmit={handleEnviarMensaje} className="chat-input-form">
+              {/* Menu desplegable de opciones */}
+              <div className="menu-input-wrapper" ref={menuInputRef}>
+                <button
+                  type="button"
+                  className={`btn-menu-input ${modoChatIA ? 'modo-chatia' : 'modo-controlador'}`}
+                  onClick={() => setMenuInputAbierto(!menuInputAbierto)}
+                  aria-expanded={menuInputAbierto}
+                  aria-haspopup="true"
+                >
+                  <span className="menu-input-icon">{modoChatIA ? '◆' : '◈'}</span>
+                  <span className="menu-input-texto">{modoChatIA ? 'ChatIA' : 'Controlador'}</span>
+                  <span className="menu-input-arrow">{menuInputAbierto ? '▴' : '▾'}</span>
+                </button>
+
+                {/* Dropdown del menu */}
+                {menuInputAbierto && (
+                  <div className="menu-input-dropdown">
+                    <button
+                      type="button"
+                      className="menu-input-option"
+                      onClick={() => handleMenuInputAction('toggle-modo')}
+                    >
+                      <span className="option-icon">{modoChatIA ? '◈' : '◆'}</span>
+                      <span className="option-texto">
+                        {modoChatIA ? 'Cambiar a Controlador' : 'Cambiar a ChatIA'}
+                      </span>
+                    </button>
+                    <div className="menu-input-divider"></div>
+                    <button
+                      type="button"
+                      className="menu-input-option option-reiniciar"
+                      onClick={() => handleMenuInputAction('reiniciar')}
+                    >
+                      <span className="option-icon">↻</span>
+                      <span className="option-texto">Reiniciar chat</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
               <textarea
                 ref={inputRef}
                 value={inputMensaje}
                 onChange={(e) => setInputMensaje(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Escribe tu mensaje..."
+                placeholder={modoChatIA ? "Pregunta lo que quieras..." : "Escribe tu mensaje..."}
                 disabled={enviando || mensajesCount >= 20}
                 rows={1}
               />
@@ -693,27 +755,16 @@ const Chat = () => {
             />
           </div>
         )}
-
-        {/* Boton flotante para alternar entre modos - SOLO DESKTOP */}
-        <button
-          className={`btn-flotante-modo desktop-only ${modoChatIA ? 'modo-controlador' : 'modo-chatia'}`}
-          onClick={toggleModoChatIA}
-        >
-          <span className="btn-flotante-icon">{modoChatIA ? '◀' : '◆'}</span>
-          <span className="btn-flotante-texto">
-            {modoChatIA ? 'Volver al Controlador' : 'Modo ChatIA'}
-          </span>
-        </button>
       </div>
 
-      {/* Barra de navegacion inferior - SOLO MOVIL */}
+      {/* Barra de navegacion inferior - SOLO MOVIL (2 tabs) */}
       <nav className="mobile-nav">
         <button
           className={`mobile-nav-btn ${vistaMobile === 'chat' ? 'active' : ''}`}
           onClick={() => cambiarVistaMobile('chat')}
         >
-          <span className="mobile-nav-icon">◈</span>
-          <span className="mobile-nav-label">Chat BD</span>
+          <span className="mobile-nav-icon">{modoChatIA ? '◆' : '◈'}</span>
+          <span className="mobile-nav-label">Chat</span>
         </button>
         <button
           className={`mobile-nav-btn ${vistaMobile === 'editor' ? 'active' : ''}`}
@@ -721,13 +772,6 @@ const Chat = () => {
         >
           <span className="mobile-nav-icon">≡</span>
           <span className="mobile-nav-label">Editor</span>
-        </button>
-        <button
-          className={`mobile-nav-btn ${vistaMobile === 'chatia' ? 'active' : ''}`}
-          onClick={() => cambiarVistaMobile('chatia')}
-        >
-          <span className="mobile-nav-icon">◆</span>
-          <span className="mobile-nav-label">Chat IA</span>
         </button>
       </nav>
     </div>
