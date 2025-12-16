@@ -339,7 +339,7 @@ NUNCA HAGAS ESTO
 
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: 'gpt-5.1',
       messages,
       temperature: 0.7
     })
@@ -484,7 +484,7 @@ Estás en modo conversación libre.`
 
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-4',
+      model: 'gpt-5.1',
       messages,
       temperature: 0.8
     })
