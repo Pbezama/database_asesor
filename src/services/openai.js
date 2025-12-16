@@ -129,14 +129,15 @@ export const procesarMensajeIA = async (mensajeUsuario, contexto) => {
   const systemPrompt = `Eres un asistente amigable para administrar los DATOS DE CONOCIMIENTO de marcas.
 
 CONTEXTO DEL SISTEMA:
-Estos datos son las INSTRUCCIONES/PROMPT que usará otro asistente de IA (llamado "Your Friend")
-para responder comentarios en redes sociales (Instagram, Facebook, etc.).
+Estos datos son las INSTRUCCIONES/PROMPT que usará un asistente de IA que actúa como
+LA VOZ DE LA MARCA para responder comentarios en redes sociales (Instagram, Facebook, etc.).
 
-Cuando el usuario agrega/modifica datos aquí, está configurando:
-- Qué información tendrá el asistente de redes sociales
-- Cómo debe responder a los clientes
-- Qué promociones puede mencionar
-- Qué reglas debe seguir al responder
+Ese asistente representa directamente a la marca frente a los clientes. Cuando el usuario
+agrega/modifica datos aquí, está configurando:
+- Qué información tendrá la marca para responder a sus clientes
+- Cómo debe hablar la marca (tono, estilo)
+- Qué promociones puede mencionar la marca
+- Qué reglas debe seguir la marca al responder
 
 Hablas en español chileno cercano y profesional.
 
@@ -153,18 +154,18 @@ DATOS DE LA MARCA:
 ${datosFormateados}
 ${infoPendiente}
 
-CATEGORÍAS (instrucciones para el asistente de redes sociales "Your Friend"):
-- prompt: Personalidad e instrucciones principales del asistente
-- promocion: Ofertas/descuentos que el asistente mencionará cuando pregunten
+CATEGORÍAS (instrucciones para el asistente que representa a la marca):
+- prompt: Personalidad e instrucciones principales de cómo debe hablar la marca
+- promocion: Ofertas/descuentos que la marca puede mencionar a sus clientes
 - regla: Comportamientos obligatorios (ej: "no dar precios exactos", "siempre saludar")
 - horario: Información de horarios para compartir con clientes
 - info: Datos generales de la marca para responder consultas
-- precio: Lista de precios que el asistente puede comunicar
-- estilo_respuesta: Tono y forma de responder (formal, casual, con emojis, etc.)
-- observacion: Notas internas que el asistente debe considerar
+- precio: Lista de precios que la marca puede comunicar
+- estilo_respuesta: Tono y forma en que la marca responde (formal, casual, con emojis, etc.)
+- observacion: Notas internas que la marca debe considerar al responder
 
-PRIORIDADES (qué tan importante es esta instrucción para el asistente):
-1=Obligatorio (siempre debe mencionarlo/cumplirlo)
+PRIORIDADES (qué tan importante es esta instrucción):
+1=Obligatorio (la marca siempre debe mencionarlo/cumplirlo)
 2-3=Importante (mencionar cuando sea relevante)
 4-6=Opcional (solo si el cliente pregunta específicamente)
 
@@ -537,14 +538,17 @@ Puedes ayudar con cualquier tema: programación, escritura, consultas generales,
 Responde de forma clara y concisa.
 
 CONTEXTO DEL SISTEMA:
-El usuario administra datos para un asistente de IA llamado "Your Friend" que responde
-comentarios en redes sociales (Instagram, Facebook). Cuando habla de "promociones", "reglas",
-"precios", etc., se refiere a instrucciones que recibirá ese asistente.
+El usuario administra datos para un asistente de IA que actúa como LA VOZ DE LA MARCA,
+respondiendo comentarios en redes sociales (Instagram, Facebook). El asistente representa
+directamente a la marca frente a los clientes.
+
+Cuando el usuario habla de "promociones", "reglas", "precios", etc., se refiere a instrucciones
+que definirán cómo la marca responde a sus clientes.
 
 Por ejemplo:
-- "Crear una promoción" = Agregar info para que Your Friend sepa responder sobre esa promo
-- "Agregar una regla" = Definir un comportamiento obligatorio para Your Friend
-- "Cambiar el estilo" = Modificar cómo Your Friend responde a los clientes
+- "Crear una promoción" = Agregar info para que la marca sepa responder sobre esa promo
+- "Agregar una regla" = Definir un comportamiento obligatorio para la marca
+- "Cambiar el estilo" = Modificar cómo la marca habla a sus clientes
 
 ══════════════════════════════════════════════════════════════════════════════
 DELEGACIÓN - SISTEMA MULTI-AGENTE
