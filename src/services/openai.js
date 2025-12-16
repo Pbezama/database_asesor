@@ -458,23 +458,39 @@ HISTORIAL COMPARTIDO:
       // Limpiar el mensaje de posibles JSON residuales
       let contenidoLimpio = parsed.mensaje || parsed.contenido || ''
 
-      // Si el contenido contiene un JSON al final, removerlo
+      // Si el contenido contiene un JSON, removerlo
       if (contenidoLimpio.includes('{"tipo"')) {
         const jsonIndex = contenidoLimpio.indexOf('{"tipo"')
         if (jsonIndex > 0) {
+          // JSON al final del texto - removerlo
           contenidoLimpio = contenidoLimpio.substring(0, jsonIndex).trim()
+        } else if (jsonIndex === 0) {
+          // El mensaje ES un JSON stringificado - intentar extraer el mensaje interno
+          try {
+            const jsonInterno = JSON.parse(contenidoLimpio)
+            if (jsonInterno.mensaje) {
+              contenidoLimpio = jsonInterno.mensaje
+              // Actualizar parsed con datos del JSON interno si existen
+              if (jsonInterno.delegacion && !parsed.delegacion) {
+                parsed.delegacion = jsonInterno.delegacion
+              }
+            }
+          } catch {
+            // Si falla, mantener el contenido limpio vacío para usar el mensaje normal
+            contenidoLimpio = ''
+          }
         }
       }
 
       const respuestaNormalizada = {
         tipo: parsed.tipo || 'texto',
-        contenido: contenidoLimpio || respuestaRaw,
+        contenido: contenidoLimpio || parsed.mensaje || parsed.contenido || 'Mensaje procesado',
         datos: parsed.datos || null,
         ejecutar: parsed.ejecutar || null,
         accionPendiente: null,
         filtros: parsed.filtros || null,
         mensaje: parsed.mensaje || null,
-        delegacion: parsed.delegacion || null  // NUEVO: soporte para delegación
+        delegacion: parsed.delegacion || null
       }
 
       // Si es confirmación, guardar los parámetros para cuando el usuario confirme
@@ -497,15 +513,34 @@ HISTORIAL COMPARTIDO:
 
       return respuestaNormalizada
     } catch {
-      // Si no es JSON válido, intentar limpiar el texto de JSON residual
-      console.warn('⚠️ Respuesta no es JSON válido:', respuestaRaw)
+      // Si no es JSON válido, intentar extraer datos del texto
+      console.warn('⚠️ Respuesta no es JSON válido, intentando extraer:', respuestaRaw)
 
       let contenidoFinal = respuestaRaw
+      let delegacionExtraida = null
 
-      // Remover cualquier JSON visible al final del texto
-      const jsonMatch = contenidoFinal.match(/\{"tipo"[\s\S]*\}$/)
+      // Intentar extraer JSON embebido en el texto
+      const jsonMatch = contenidoFinal.match(/\{[\s\S]*"tipo"[\s\S]*\}/)
       if (jsonMatch) {
-        contenidoFinal = contenidoFinal.replace(jsonMatch[0], '').trim()
+        try {
+          const jsonExtraido = JSON.parse(jsonMatch[0])
+          // Si logramos parsear, extraer mensaje y delegación
+          if (jsonExtraido.mensaje) {
+            contenidoFinal = jsonExtraido.mensaje
+          }
+          if (jsonExtraido.delegacion) {
+            delegacionExtraida = jsonExtraido.delegacion
+          }
+
+          return {
+            tipo: jsonExtraido.tipo || 'texto',
+            contenido: contenidoFinal,
+            delegacion: delegacionExtraida
+          }
+        } catch {
+          // Si falla el parse del JSON extraído, limpiar el texto
+          contenidoFinal = contenidoFinal.replace(jsonMatch[0], '').trim()
+        }
       }
 
       // Si quedó vacío después de limpiar, usar el original
@@ -515,7 +550,8 @@ HISTORIAL COMPARTIDO:
 
       return {
         tipo: 'texto',
-        contenido: contenidoFinal
+        contenido: contenidoFinal,
+        delegacion: delegacionExtraida
       }
     }
   } catch (err) {
