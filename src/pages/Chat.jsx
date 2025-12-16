@@ -181,7 +181,10 @@ const Chat = () => {
         rol: m.rol,
         contenido: m.contenido,
         modoOrigen: m.modoOrigen,
-        tipo: m.tipo
+        tipo: m.tipo,
+        comentariosCompletos: m.comentariosCompletos,
+        datos: m.datos,
+        tabla_preview: m.tabla_preview
       }))
 
       let respuesta
@@ -289,7 +292,10 @@ const Chat = () => {
         rol: m.rol,
         contenido: m.contenido,
         modoOrigen: m.modoOrigen,
-        tipo: m.tipo
+        tipo: m.tipo,
+        comentariosCompletos: m.comentariosCompletos,
+        datos: m.datos,
+        tabla_preview: m.tabla_preview
       }))
 
       let respuesta
