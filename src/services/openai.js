@@ -32,15 +32,42 @@ const obtenerFechaActual = () => {
 // ═══════════════════════════════════════════════════════════════
 
 const formatearHistorialCompartido = (historial, modoActual) => {
-  return historial.slice(-24).map(m => {
+  return historial.slice(-30).map(m => {
     // Ignorar separadores y delegaciones en el historial
     if (m.tipo === 'separador' || m.tipo === 'delegacion') return null
 
     let contenido = typeof m.contenido === 'string' ? m.contenido : JSON.stringify(m.contenido)
 
+    // IMPORTANTE: Incluir datos estructurados (tablas, comentarios, etc.)
+    if (m.datos && Array.isArray(m.datos) && m.datos.length > 0) {
+      const datosFormateados = m.datos.map(d => {
+        // Formatear cada registro de datos de forma legible
+        if (typeof d === 'object') {
+          return Object.entries(d)
+            .map(([key, val]) => `${key}: ${val}`)
+            .join(' | ')
+        }
+        return String(d)
+      }).join('\n')
+      contenido += `\n\n[DATOS MOSTRADOS]:\n${datosFormateados}`
+    }
+
+    // Incluir información de tablas preview si existe
+    if (m.tabla_preview && Array.isArray(m.tabla_preview) && m.tabla_preview.length > 0) {
+      const tablaFormateada = m.tabla_preview.map(row => {
+        if (typeof row === 'object') {
+          return Object.entries(row)
+            .map(([key, val]) => `${key}: ${val}`)
+            .join(' | ')
+        }
+        return String(row)
+      }).join('\n')
+      contenido += `\n\n[TABLA/COMENTARIOS]:\n${tablaFormateada}`
+    }
+
     // Agregar prefijo de contexto si viene de otro modo
     if (m.modoOrigen && m.modoOrigen !== modoActual) {
-      const prefijo = m.modoOrigen === 'chatia' ? '[Contexto de ChatIA]' : '[Contexto del Controlador]'
+      const prefijo = m.modoOrigen === 'chatia' ? '[ChatIA]' : '[Controlador]'
       contenido = `${prefijo} ${contenido}`
     }
 
