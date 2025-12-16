@@ -38,18 +38,36 @@ const formatearHistorialCompartido = (historial, modoActual) => {
 
     let contenido = typeof m.contenido === 'string' ? m.contenido : JSON.stringify(m.contenido)
 
-    // IMPORTANTE: Incluir datos estructurados (tablas, comentarios, etc.)
-    if (m.datos && Array.isArray(m.datos) && m.datos.length > 0) {
-      const datosFormateados = m.datos.map(d => {
-        // Formatear cada registro de datos de forma legible
-        if (typeof d === 'object') {
-          return Object.entries(d)
-            .map(([key, val]) => `${key}: ${val}`)
-            .join(' | ')
-        }
-        return String(d)
+    // IMPORTANTE: Incluir comentarios completos si existen
+    if (m.comentariosCompletos && Array.isArray(m.comentariosCompletos) && m.comentariosCompletos.length > 0) {
+      const comentariosFormateados = m.comentariosCompletos.map((c, i) => {
+        return `${i + 1}. ID:${c.id} | Comentario: "${c.comentario_original || 'N/A'}" | Respuesta: "${c.respuesta_comentario || 'Sin respuesta'}" | Fecha: ${c.creado_en ? new Date(c.creado_en).toLocaleDateString('es-CL') : 'N/A'}`
       }).join('\n')
-      contenido += `\n\n[DATOS MOSTRADOS]:\n${datosFormateados}`
+      contenido += `\n\n[COMENTARIOS CONSULTADOS (${m.comentariosCompletos.length} total)]:\n${comentariosFormateados}`
+    }
+
+    // Incluir datos estructurados (tablas de datos de marca, etc.)
+    if (m.datos) {
+      // Si es formato { columnas, filas } (tablas)
+      if (m.datos.columnas && m.datos.filas) {
+        const { columnas, filas } = m.datos
+        const tablaFormateada = filas.map(fila => {
+          return columnas.map((col, i) => `${col}: ${fila[i] || 'N/A'}`).join(' | ')
+        }).join('\n')
+        contenido += `\n\n[TABLA MOSTRADA]:\n${tablaFormateada}`
+      }
+      // Si es un array de objetos
+      else if (Array.isArray(m.datos) && m.datos.length > 0) {
+        const datosFormateados = m.datos.map(d => {
+          if (typeof d === 'object') {
+            return Object.entries(d)
+              .map(([key, val]) => `${key}: ${val}`)
+              .join(' | ')
+          }
+          return String(d)
+        }).join('\n')
+        contenido += `\n\n[DATOS MOSTRADOS]:\n${datosFormateados}`
+      }
     }
 
     // Incluir información de tablas preview si existe
@@ -62,7 +80,7 @@ const formatearHistorialCompartido = (historial, modoActual) => {
         }
         return String(row)
       }).join('\n')
-      contenido += `\n\n[TABLA/COMENTARIOS]:\n${tablaFormateada}`
+      contenido += `\n\n[PREVIEW]:\n${tablaFormateada}`
     }
 
     // Agregar prefijo de contexto si viene de otro modo

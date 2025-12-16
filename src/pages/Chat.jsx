@@ -377,21 +377,26 @@ const Chat = () => {
             contenido: respuesta.mensaje || `Encontre ${resultadoComentarios.total} comentarios.`,
             tipo: 'tabla',
             datos: { columnas, filas },
-            timestamp: new Date().toISOString()
+            // Guardar comentarios completos para el historial compartido
+            comentariosCompletos: resultadoComentarios.data,
+            timestamp: new Date().toISOString(),
+            modoOrigen: 'controlador'
           }
         } else if (resultadoComentarios.success && resultadoComentarios.data.length === 0) {
           mensajeResultado = {
             rol: 'assistant',
             contenido: 'No encontre comentarios con los filtros especificados.',
             tipo: 'texto',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            modoOrigen: 'controlador'
           }
         } else {
           mensajeResultado = {
             rol: 'assistant',
             contenido: `Error consultando comentarios: ${resultadoComentarios.error}`,
             tipo: 'error',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            modoOrigen: 'controlador'
           }
         }
 
