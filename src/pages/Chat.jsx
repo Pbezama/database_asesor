@@ -11,7 +11,7 @@ import {
   desactivarDato,
   consultarComentarios
 } from '../services/supabase'
-import { procesarMensajeIA, chatDirectoIA } from '../services/openai'
+import { procesarMensajeIA, chatDirectoIA, transcribirAudio } from '../services/openai'
 import MensajeChat from '../components/MensajeChat'
 import EditorManual from '../components/EditorManual'
 import '../styles/Chat.css'
@@ -28,12 +28,18 @@ const Chat = () => {
   const [vistaMobile, setVistaMobile] = useState('chat')
   // Estado para el menu desplegable del input
   const [menuInputAbierto, setMenuInputAbierto] = useState(false)
+  // Estados para grabacion de voz
+  const [grabandoVoz, setGrabandoVoz] = useState(false)
+  const [transcribiendo, setTranscribiendo] = useState(false)
 
   const { usuario, logout, sesionChatId, mensajesCount, incrementarMensajes, reiniciarChat, esSuperAdmin } = useAuth()
   const navigate = useNavigate()
   const chatEndRef = useRef(null)
   const inputRef = useRef(null)
   const menuInputRef = useRef(null)
+  const mediaRecorderRef = useRef(null)
+  const audioChunksRef = useRef([])
+  const streamRef = useRef(null)
 
   useEffect(() => {
     if (!usuario) {
@@ -532,6 +538,61 @@ const Chat = () => {
     }
   }
 
+  // ═══════════════════════════════════════════════════════════════
+  // GRABACION DE VOZ
+  // ═══════════════════════════════════════════════════════════════
+
+  const iniciarGrabacion = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      streamRef.current = stream
+
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' })
+      mediaRecorderRef.current = mediaRecorder
+      audioChunksRef.current = []
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data)
+        }
+      }
+
+      mediaRecorder.onstop = async () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+
+        // Detener el stream del microfono
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach(track => track.stop())
+          streamRef.current = null
+        }
+
+        // Transcribir el audio
+        setTranscribiendo(true)
+        try {
+          const textoTranscrito = await transcribirAudio(audioBlob)
+          if (textoTranscrito) {
+            setInputMensaje(prev => prev + (prev ? ' ' : '') + textoTranscrito)
+          }
+        } catch (error) {
+          console.error('Error transcribiendo:', error)
+        }
+        setTranscribiendo(false)
+      }
+
+      mediaRecorder.start()
+      setGrabandoVoz(true)
+    } catch (error) {
+      console.error('Error accediendo al microfono:', error)
+    }
+  }
+
+  const detenerGrabacion = () => {
+    if (mediaRecorderRef.current && grabandoVoz) {
+      mediaRecorderRef.current.stop()
+      setGrabandoVoz(false)
+    }
+  }
+
   // Función para manejar respuestas rápidas desde los botones Sí/No
   const handleRespuestaRapida = async (respuesta) => {
     if (enviando) return
@@ -720,9 +781,18 @@ const Chat = () => {
                 onChange={(e) => setInputMensaje(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder={modoChatIA ? "Pregunta lo que quieras..." : "Escribe tu mensaje..."}
-                disabled={enviando || mensajesCount >= 20}
+                disabled={enviando || mensajesCount >= 20 || grabandoVoz}
                 rows={1}
               />
+              <button
+                type="button"
+                onClick={grabandoVoz ? detenerGrabacion : iniciarGrabacion}
+                className={`btn-microfono ${grabandoVoz ? 'grabando' : ''} ${transcribiendo ? 'transcribiendo' : ''}`}
+                disabled={enviando || transcribiendo}
+                title={grabandoVoz ? 'Detener grabacion' : 'Grabar mensaje de voz'}
+              >
+                {transcribiendo ? '...' : grabandoVoz ? '■' : '🎤'}
+              </button>
               <button
                 type="submit"
                 disabled={enviando || !inputMensaje.trim() || mensajesCount >= 20}

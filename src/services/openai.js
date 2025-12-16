@@ -501,3 +501,30 @@ Estás en modo conversación libre.`
     }
   }
 }
+
+// ═══════════════════════════════════════════════════════════════
+// TRANSCRIPCION DE AUDIO (Whisper API)
+// ═══════════════════════════════════════════════════════════════
+
+export const transcribirAudio = async (audioBlob) => {
+  const formData = new FormData()
+  formData.append('file', audioBlob, 'audio.webm')
+  formData.append('model', 'whisper-1')
+  formData.append('language', 'es')
+
+  const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${import.meta.env.VITE_OPENAI_API_KEY}`
+    },
+    body: formData
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}))
+    throw new Error(errorData.error?.message || 'Error en la transcripcion')
+  }
+
+  const data = await response.json()
+  return data.text
+}

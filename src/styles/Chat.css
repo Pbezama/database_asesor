@@ -356,6 +356,54 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   BOTON DE MICROFONO
+   ═══════════════════════════════════════════════════════════════ */
+
+.btn-microfono {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: none;
+  background: #f0f0f0;
+  color: #333;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.btn-microfono:hover:not(:disabled) {
+  background: #e0e0e0;
+  transform: scale(1.05);
+}
+
+.btn-microfono.grabando {
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  animation: pulse-mic 1s infinite;
+  box-shadow: 0 2px 12px rgba(239, 68, 68, 0.4);
+}
+
+.btn-microfono.transcribiendo {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  box-shadow: 0 2px 12px rgba(245, 158, 11, 0.4);
+}
+
+.btn-microfono:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@keyframes pulse-mic {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+}
+
+/* ═══════════════════════════════════════════════════════════════
    MENU DE OPCIONES EN INPUT
    ═══════════════════════════════════════════════════════════════ */
 
@@ -724,6 +772,12 @@
     height: 44px;
     font-size: 16px;
     border-radius: 10px;
+  }
+
+  .btn-microfono {
+    width: 44px;
+    height: 44px;
+    font-size: 16px;
   }
 
   /* ═══════════════════════════════════════════════════════════════
