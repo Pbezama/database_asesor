@@ -9,7 +9,10 @@
       "Bash(dir:*)",
       "Bash(cat:*)",
       "WebSearch",
-      "Bash(npm run lint)"
+      "Bash(npm run lint)",
+      "WebFetch(domain:platform.openai.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:faheemkhaskheli9.medium.com)"
     ]
   }
 }

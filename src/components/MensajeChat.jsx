@@ -22,10 +22,11 @@ const MensajeChat = ({
   modoChatIA,
   onToggleModo,
   onRespuestaRapida,
+  onDelegacion,
   nombreMarca = '',
   usuario = null
 }) => {
-  const { rol, contenido, tipo, datos, tabla_preview, resumen, mostrarBotonModo } = mensaje
+  const { rol, contenido, tipo, datos, tabla_preview, resumen, mostrarBotonModo, modoOrigen, delegacion, desde, hacia } = mensaje
   const esUsuario = rol === 'user'
   const [respondido, setRespondido] = useState(false)
 
@@ -838,16 +839,81 @@ const MensajeChat = ({
   }
 
   // ═══════════════════════════════════════════════════════════════
+  // RENDERIZAR SEPARADOR DE CAMBIO DE MODO
+  // ═══════════════════════════════════════════════════════════════
+
+  const renderizarSeparador = () => {
+    return (
+      <div className={`mensaje-separador separador-a-${modoOrigen}`}>
+        <div className="separador-linea">
+          <span className="separador-texto">
+            {modoOrigen === 'chatia' ? '◆' : '◈'} {contenido}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // RENDERIZAR DELEGACION AUTOMATICA
+  // ═══════════════════════════════════════════════════════════════
+
+  const renderizarDelegacion = () => {
+    return (
+      <div className={`mensaje-delegacion delegacion-${desde}-a-${hacia}`}>
+        <div className="delegacion-contenido">
+          <span className="delegacion-icono">→</span>
+          <span className="delegacion-texto">{contenido}</span>
+        </div>
+      </div>
+    )
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // RENDERIZAR SUGERENCIA DE DELEGACION
+  // ═══════════════════════════════════════════════════════════════
+
+  const renderizarSugerenciaDelegacion = () => {
+    if (!delegacion?.sugerida) return null
+
+    return (
+      <div className="mensaje-sugerencia-delegacion">
+        <p className="delegacion-razon">{delegacion.razon}</p>
+        <button
+          className="btn-delegar"
+          onClick={() => onDelegacion && onDelegacion(delegacion)}
+        >
+          → Delegar a {delegacion.agenteDestino === 'chatia' ? 'ChatIA' : 'Controlador'}
+        </button>
+      </div>
+    )
+  }
+
+  // ═══════════════════════════════════════════════════════════════
   // RENDER PRINCIPAL
   // ═══════════════════════════════════════════════════════════════
 
+  // Renderizar separador si es tipo separador
+  if (tipo === 'separador') {
+    return renderizarSeparador()
+  }
+
+  // Renderizar delegacion si es tipo delegacion
+  if (tipo === 'delegacion') {
+    return renderizarDelegacion()
+  }
+
+  // Clase adicional por modo de origen
+  const claseModo = modoOrigen ? `mensaje-modo-${modoOrigen}` : ''
+
   return (
-    <div className={`mensaje ${esUsuario ? 'mensaje-usuario' : 'mensaje-asistente'} ${tipo ? `mensaje-tipo-${tipo}` : ''}`}>
+    <div className={`mensaje ${esUsuario ? 'mensaje-usuario' : 'mensaje-asistente'} ${tipo ? `mensaje-tipo-${tipo}` : ''} ${claseModo}`}>
       <div className="mensaje-avatar">
-        {esUsuario ? '◯' : '◈'}
+        {esUsuario ? '◯' : (modoOrigen === 'chatia' ? '◆' : '◈')}
       </div>
       <div className="mensaje-contenido">
         {renderizarContenido()}
+        {renderizarSugerenciaDelegacion()}
         <div className="mensaje-timestamp">
           {new Date(mensaje.timestamp).toLocaleTimeString('es-CL', {
             hour: '2-digit',

@@ -30,6 +30,188 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════
+   MENSAJES POR MODO DE ORIGEN
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Mensajes modo Controlador - Azul */
+.mensaje-modo-controlador.mensaje-asistente {
+  background: #ffffff;
+  border-left: 3px solid #3b82f6;
+}
+
+.mensaje-modo-controlador.mensaje-usuario {
+  background: #eff6ff;
+}
+
+/* Mensajes modo ChatIA - Violeta */
+.mensaje-modo-chatia.mensaje-asistente {
+  background: #faf5ff;
+  border-left: 3px solid #8b5cf6;
+}
+
+.mensaje-modo-chatia.mensaje-usuario {
+  background: #f5f3ff;
+}
+
+/* Avatar segun modo */
+.mensaje-modo-chatia .mensaje-avatar {
+  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SEPARADOR DE CAMBIO DE MODO
+   ═══════════════════════════════════════════════════════════════ */
+
+.mensaje-separador {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px 24px;
+  animation: fadeInUp 0.3s ease-out;
+}
+
+.separador-linea {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.separador-linea::before,
+.separador-linea::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #cbd5e1, transparent);
+}
+
+.separador-texto {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 20px;
+  white-space: nowrap;
+}
+
+.separador-a-chatia .separador-texto {
+  background: #f5f3ff;
+  color: #7c3aed;
+}
+
+.separador-a-controlador .separador-texto {
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DELEGACION AUTOMATICA
+   ═══════════════════════════════════════════════════════════════ */
+
+.mensaje-delegacion {
+  display: flex;
+  justify-content: center;
+  padding: 12px 24px;
+  animation: fadeInUp 0.3s ease-out;
+}
+
+.delegacion-contenido {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 25px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.delegacion-icono {
+  font-size: 16px;
+}
+
+.delegacion-chatia-a-controlador .delegacion-contenido {
+  background: linear-gradient(90deg, #f5f3ff, #eff6ff);
+  color: #4338ca;
+}
+
+.delegacion-controlador-a-chatia .delegacion-contenido {
+  background: linear-gradient(90deg, #eff6ff, #f5f3ff);
+  color: #6d28d9;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   SUGERENCIA DE DELEGACION EN MENSAJE
+   ═══════════════════════════════════════════════════════════════ */
+
+.mensaje-sugerencia-delegacion {
+  margin-top: 12px;
+  padding: 12px;
+  background: #fefce8;
+  border: 1px solid #fef08a;
+  border-radius: 8px;
+}
+
+.delegacion-razon {
+  font-size: 13px;
+  color: #854d0e;
+  margin: 0 0 8px 0;
+  line-height: 1.4;
+}
+
+.btn-delegar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: #fbbf24;
+  color: #78350f;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-delegar:hover {
+  background: #f59e0b;
+  transform: translateY(-1px);
+}
+
+/* Responsive para separadores y delegacion */
+@media (max-width: 768px) {
+  .mensaje-separador {
+    padding: 12px 16px;
+  }
+
+  .separador-texto {
+    font-size: 11px;
+    padding: 6px 12px;
+  }
+
+  .mensaje-delegacion {
+    padding: 10px 16px;
+  }
+
+  .delegacion-contenido {
+    padding: 8px 14px;
+    font-size: 12px;
+  }
+
+  .mensaje-sugerencia-delegacion {
+    margin-top: 10px;
+    padding: 10px;
+  }
+
+  .delegacion-razon {
+    font-size: 12px;
+  }
+
+  .btn-delegar {
+    padding: 7px 14px;
+    font-size: 12px;
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
    AVATAR
    ═══════════════════════════════════════════════════════════════ */
 

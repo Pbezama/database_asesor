@@ -28,6 +28,27 @@ const obtenerFechaActual = () => {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// FORMATEAR HISTORIAL COMPARTIDO ENTRE AGENTES
+// ═══════════════════════════════════════════════════════════════
+
+const formatearHistorialCompartido = (historial, modoActual) => {
+  return historial.slice(-24).map(m => {
+    // Ignorar separadores y delegaciones en el historial
+    if (m.tipo === 'separador' || m.tipo === 'delegacion') return null
+
+    let contenido = typeof m.contenido === 'string' ? m.contenido : JSON.stringify(m.contenido)
+
+    // Agregar prefijo de contexto si viene de otro modo
+    if (m.modoOrigen && m.modoOrigen !== modoActual) {
+      const prefijo = m.modoOrigen === 'chatia' ? '[Contexto de ChatIA]' : '[Contexto del Controlador]'
+      contenido = `${prefijo} ${contenido}`
+    }
+
+    return { role: m.rol === 'user' ? 'user' : 'assistant', content: contenido }
+  }).filter(Boolean)
+}
+
+// ═══════════════════════════════════════════════════════════════
 // FORMATEAR DATOS PARA EL PROMPT
 // ═══════════════════════════════════════════════════════════════
 
@@ -325,15 +346,35 @@ NUNCA HAGAS ESTO
 ✅ Usa **texto** para negritas dentro del mensaje
 ✅ Usa los IDs reales de Supabase (los que aparecen en [ID:XX])
 ✅ Solo UN id_fila por acción de modificar/desactivar
-✅ SIEMPRE incluye "ejecutar" cuando el usuario confirma una acción`
+✅ SIEMPRE incluye "ejecutar" cuando el usuario confirma una acción
 
-  // Construir mensajes del historial
+══════════════════════════════════════════════════════════════════════════════
+DELEGACIÓN - SISTEMA MULTI-AGENTE
+══════════════════════════════════════════════════════════════════════════════
+
+Eres parte de un sistema multi-agente. Puedes DELEGAR tareas a otros agentes:
+
+AGENTES DISPONIBLES:
+- ChatIA: Para ideación, brainstorming, consultas generales, creatividad
+
+CUÁNDO DELEGAR A ChatIA:
+- El usuario pide ayuda para IDEAR promociones/reglas/contenido (ej: "no sé qué promoción hacer", "ayúdame a pensar")
+- El usuario quiere hacer brainstorming o lluvia de ideas
+- El usuario hace preguntas generales no relacionadas con la BD
+- El usuario necesita creatividad o redacción
+
+FORMATO PARA SUGERIR DELEGACIÓN (tipo 12):
+{"tipo":"texto","mensaje":"Entiendo que quieres idear promociones. ChatIA es experto en eso.","delegacion":{"sugerida":true,"agenteDestino":"chatia","razon":"ChatIA puede ayudarte a generar ideas creativas para tu promoción.","datosParaDelegar":{"contexto":"El usuario quiere crear promociones","datosRelevantes":{"marca":"${nombreMarca}","categorias":["promocion","regla","precio"]}}}}
+
+HISTORIAL COMPARTIDO:
+- Los mensajes con [Contexto de ChatIA] vienen de ese agente
+- Si ves una idea de ChatIA que el usuario quiere implementar, ofrece agregarla directamente a la BD
+- Ejemplo: si ChatIA sugirió "30% descuento navidad" y el usuario dice "agrega eso", procede con la confirmación normal`
+
+  // Construir mensajes del historial usando formato compartido
   const messages = [
     { role: 'system', content: systemPrompt },
-    ...historial.slice(-18).map(m => ({
-      role: m.rol === 'user' ? 'user' : 'assistant',
-      content: typeof m.contenido === 'string' ? m.contenido : JSON.stringify(m.contenido)
-    })),
+    ...formatearHistorialCompartido(historial, 'controlador'),
     { role: 'user', content: mensajeUsuario }
   ]
 
@@ -408,7 +449,8 @@ NUNCA HAGAS ESTO
         ejecutar: parsed.ejecutar || null,
         accionPendiente: null,
         filtros: parsed.filtros || null,
-        mensaje: parsed.mensaje || null
+        mensaje: parsed.mensaje || null,
+        delegacion: parsed.delegacion || null  // NUEVO: soporte para delegación
       }
 
       // Si es confirmación, guardar los parámetros para cuando el usuario confirme
@@ -465,20 +507,51 @@ NUNCA HAGAS ESTO
 // CHAT DIRECTO CON CHATGPT (SIN FUNCIONES DE BASE DE DATOS)
 // ═══════════════════════════════════════════════════════════════
 
-export const chatDirectoIA = async (mensajeUsuario, historial = []) => {
+export const chatDirectoIA = async (mensajeUsuario, historial = [], contextoMarca = null) => {
   const systemPrompt = `Eres ChatIA, un asistente de inteligencia artificial amigable y útil.
 Hablas en español de forma cercana y profesional.
 Puedes ayudar con cualquier tema: programación, escritura, consultas generales, ideas creativas, explicaciones, etc.
 Responde de forma clara y concisa.
-NO tienes acceso a bases de datos ni funciones de administración en este modo.
-Estás en modo conversación libre.`
 
+══════════════════════════════════════════════════════════════════════════════
+DELEGACIÓN - SISTEMA MULTI-AGENTE
+══════════════════════════════════════════════════════════════════════════════
+
+Eres parte de un sistema multi-agente. Puedes DELEGAR tareas a otros agentes:
+
+AGENTES DISPONIBLES:
+- Controlador: Para operaciones de base de datos (agregar, modificar, eliminar registros)
+
+CUÁNDO DELEGAR AL CONTROLADOR:
+- El usuario quiere AGREGAR algo a la base de datos (promoción, regla, precio, etc.)
+- El usuario quiere MODIFICAR o ELIMINAR un registro existente
+- El usuario dice "agrega esto", "guarda esto", "crea esta promoción", "registra esto", etc.
+- Después de idear algo, el usuario quiere implementarlo/guardarlo
+
+FORMATO DE RESPUESTA:
+SIEMPRE responde con JSON válido. Hay dos formatos:
+
+1. RESPUESTA NORMAL (sin delegación):
+{"tipo":"texto","mensaje":"Tu respuesta aquí"}
+
+2. SUGERIR DELEGACIÓN (cuando detectas intención de guardar/agregar):
+{"tipo":"texto","mensaje":"¡Excelente idea! Para agregarla a tu base de datos, puedo delegarlo al Controlador.","delegacion":{"sugerida":true,"agenteDestino":"controlador","razon":"El Controlador puede agregar esta promoción a tu base de datos.","datosParaDelegar":{"tipo":"promocion","descripcion":"30% descuento en productos navideños","sugerencias":{"categoria":"promocion","clave":"promo_navidad","valor":"30% de descuento en productos seleccionados durante navidad","prioridad":2}}}}
+
+HISTORIAL COMPARTIDO:
+- Los mensajes con [Contexto del Controlador] vienen de ese agente
+- Puedes ver qué datos ya existen en la marca si el contexto lo incluye
+- Si el usuario pregunta sobre datos existentes, puedes comentarlos pero NO modificarlos directamente
+
+IMPORTANTE:
+- SIEMPRE responde con JSON válido
+- El campo "tipo" siempre es "texto" para ChatIA
+- Solo agrega "delegacion" cuando detectes intención clara de acción de BD (guardar, agregar, modificar, eliminar)
+- NO delegues si el usuario solo está conversando o ideando sin querer guardar aún`
+
+  // Usar historial compartido
   const messages = [
     { role: 'system', content: systemPrompt },
-    ...historial.slice(-18).map(m => ({
-      role: m.rol === 'user' ? 'user' : 'assistant',
-      content: typeof m.contenido === 'string' ? m.contenido : JSON.stringify(m.contenido)
-    })),
+    ...formatearHistorialCompartido(historial, 'chatia'),
     { role: 'user', content: mensajeUsuario }
   ]
 
@@ -489,9 +562,42 @@ Estás en modo conversación libre.`
       temperature: 0.8
     })
 
-    return {
-      tipo: 'texto',
-      contenido: response.choices[0].message.content
+    const respuestaRaw = response.choices[0].message.content
+
+    // Intentar parsear JSON
+    try {
+      let respuestaLimpia = respuestaRaw.trim()
+
+      // Remover bloques de código markdown si existen
+      if (respuestaLimpia.includes('```')) {
+        const match = respuestaLimpia.match(/```(?:json)?\s*([\s\S]*?)```/)
+        if (match) {
+          respuestaLimpia = match[1].trim()
+        }
+      }
+
+      // Extraer JSON si hay texto antes
+      const jsonStart = respuestaLimpia.indexOf('{')
+      const jsonEnd = respuestaLimpia.lastIndexOf('}')
+
+      if (jsonStart !== -1 && jsonEnd !== -1 && jsonEnd > jsonStart) {
+        respuestaLimpia = respuestaLimpia.substring(jsonStart, jsonEnd + 1)
+      }
+
+      const parsed = JSON.parse(respuestaLimpia)
+
+      return {
+        tipo: 'texto',
+        contenido: parsed.mensaje || respuestaRaw,
+        delegacion: parsed.delegacion || null
+      }
+    } catch {
+      // Si no es JSON válido, devolver como texto normal
+      return {
+        tipo: 'texto',
+        contenido: respuestaRaw,
+        delegacion: null
+      }
     }
   } catch (err) {
     console.error('Error con OpenAI (Chat Directo):', err)

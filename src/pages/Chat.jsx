@@ -115,16 +115,110 @@ const Chat = () => {
   }
 
   const toggleModoChatIA = () => {
-    setModoChatIA(!modoChatIA)
-    setMensajes([])
-    setAccionPendiente(null)
-    if (!modoChatIA) {
-      // Cambiando a modo ChatIA
-      agregarMensajeBienvenidaChatIA()
-    } else {
-      // Volviendo a modo controlador
-      agregarMensajeBienvenida()
+    const modoNuevo = modoChatIA ? 'controlador' : 'chatia'
+
+    // Agregar separador visual (NO limpiar mensajes)
+    const separador = {
+      rol: 'system',
+      tipo: 'separador',
+      contenido: `Cambiaste a ${modoNuevo === 'chatia' ? 'ChatIA' : 'Controlador'}`,
+      timestamp: new Date().toISOString(),
+      modoOrigen: modoNuevo
     }
+    setMensajes(prev => [...prev, separador])
+    setModoChatIA(!modoChatIA)
+    setAccionPendiente(null)
+  }
+
+  // Nueva funcion para ejecutar delegacion automatica
+  const ejecutarDelegacion = async (delegacion) => {
+    const { agenteDestino, datosParaDelegar, razon } = delegacion
+
+    // Agregar mensaje de delegacion
+    const msgDelegacion = {
+      rol: 'system',
+      tipo: 'delegacion',
+      contenido: `${modoChatIA ? 'ChatIA' : 'Controlador'} delego a ${agenteDestino === 'chatia' ? 'ChatIA' : 'Controlador'}`,
+      desde: modoChatIA ? 'chatia' : 'controlador',
+      hacia: agenteDestino,
+      timestamp: new Date().toISOString()
+    }
+    setMensajes(prev => [...prev, msgDelegacion])
+
+    // Cambiar modo
+    const nuevoModo = agenteDestino === 'chatia'
+    setModoChatIA(nuevoModo)
+    setAccionPendiente(null)
+
+    // Si hay datos para delegar, enviarlos automaticamente al nuevo agente
+    if (datosParaDelegar) {
+      // Pequeño delay para que el cambio de modo se refleje
+      setTimeout(() => {
+        enviarMensajeConContextoDelegado(datosParaDelegar, razon)
+      }, 100)
+    }
+  }
+
+  // Enviar mensaje con contexto de delegacion
+  const enviarMensajeConContextoDelegado = async (datos, razon) => {
+    setEnviando(true)
+
+    const contextoInicial = `[DELEGACION RECIBIDA]\nRazon: ${razon}\nDatos del agente anterior:\n${JSON.stringify(datos, null, 2)}\n\nPor favor procesa esta informacion segun tus capacidades.`
+
+    // Agregar como mensaje del sistema (no visible como mensaje de usuario)
+    const mensajeContexto = {
+      rol: 'user',
+      contenido: contextoInicial,
+      timestamp: new Date().toISOString(),
+      modoOrigen: modoChatIA ? 'chatia' : 'controlador',
+      esDelegacion: true
+    }
+    setMensajes(prev => [...prev, mensajeContexto])
+
+    // Procesar con la IA correspondiente
+    try {
+      const historial = mensajes.map(m => ({
+        rol: m.rol,
+        contenido: m.contenido,
+        modoOrigen: m.modoOrigen,
+        tipo: m.tipo
+      }))
+
+      let respuesta
+      if (modoChatIA) {
+        respuesta = await chatDirectoIA(contextoInicial, historial)
+      } else {
+        respuesta = await procesarMensajeIA(contextoInicial, {
+          nombreUsuario: usuario.nombre,
+          nombreMarca: usuario.nombre_marca,
+          idMarca: usuario.id_marca,
+          esSuperAdmin,
+          datosMarca,
+          historial,
+          accionPendienteActual: accionPendiente
+        })
+      }
+
+      const mensajeRespuesta = {
+        rol: 'assistant',
+        contenido: respuesta.contenido,
+        tipo: respuesta.tipo,
+        datos: respuesta.datos,
+        delegacion: respuesta.delegacion,
+        timestamp: new Date().toISOString(),
+        modoOrigen: modoChatIA ? 'chatia' : 'controlador'
+      }
+      setMensajes(prev => [...prev, mensajeRespuesta])
+
+      // Si hay accion pendiente, guardarla
+      if (respuesta.accionPendiente) {
+        setAccionPendiente(respuesta.accionPendiente)
+      }
+    } catch (err) {
+      console.error('Error procesando delegacion:', err)
+    }
+
+    setEnviando(false)
   }
 
   // Funcion para cambiar vista en movil (solo chat/editor ahora)
@@ -172,11 +266,12 @@ const Chat = () => {
     setEnviando(true)
     incrementarMensajes()
 
-    // Agregar mensaje del usuario
+    // Agregar mensaje del usuario con modoOrigen
     const mensajeUsuario = {
       rol: 'user',
       contenido: textoMensaje,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      modoOrigen: modoChatIA ? 'chatia' : 'controlador'
     }
     setMensajes(prev => [...prev, mensajeUsuario])
 
@@ -192,7 +287,9 @@ const Chat = () => {
     try {
       const historial = mensajes.map(m => ({
         rol: m.rol,
-        contenido: m.contenido
+        contenido: m.contenido,
+        modoOrigen: m.modoOrigen,
+        tipo: m.tipo
       }))
 
       let respuesta
@@ -217,13 +314,15 @@ const Chat = () => {
       console.log('📥 Respuesta de IA:', respuesta)
       console.log('📋 Acción pendiente actual:', accionPendiente)
 
-      // En modo ChatIA, solo mostramos la respuesta sin procesar acciones
+      // En modo ChatIA, mostramos la respuesta con posible delegacion
       if (modoChatIA) {
         const mensajeRespuesta = {
           rol: 'assistant',
           contenido: respuesta.contenido,
           tipo: respuesta.tipo,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          modoOrigen: 'chatia',
+          delegacion: respuesta.delegacion || null
         }
         setMensajes(prev => [...prev, mensajeRespuesta])
 
@@ -349,7 +448,9 @@ const Chat = () => {
         contenido: respuesta.contenido,
         tipo: respuesta.tipo,
         datos: respuesta.datos,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        modoOrigen: 'controlador',
+        delegacion: respuesta.delegacion || null
       }
       setMensajes(prev => [...prev, mensajeRespuesta])
 
@@ -710,6 +811,7 @@ const Chat = () => {
                 modoChatIA={modoChatIA}
                 onToggleModo={toggleModoChatIA}
                 onRespuestaRapida={handleRespuestaRapida}
+                onDelegacion={ejecutarDelegacion}
                 nombreMarca={usuario.nombre_marca}
                 usuario={usuario}
               />
