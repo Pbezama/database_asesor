@@ -19,12 +19,9 @@
 
 /* Panel del Chat (izquierda) */
 .chat-panel {
-  flex: 0 0 60%;
-  max-width: 60%;
   display: flex;
   flex-direction: column;
-  min-width: 400px;
-  transition: all 0.3s ease;
+  min-width: 300px;
   background: #ffffff;
 }
 
@@ -35,13 +32,11 @@
 
 /* Panel del Editor (derecha) */
 .editor-panel {
-  flex: 0 0 40%;
-  min-width: 40%;
   display: flex;
   flex-direction: column;
   background: #ffffff;
-  border-left: 1px solid #e2e8f0;
   animation: slideIn 0.3s ease;
+  min-width: 250px;
 }
 
 @keyframes slideIn {
@@ -53,6 +48,58 @@
     opacity: 1;
     transform: translateX(0);
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   DIVISOR REDIMENSIONABLE
+   ═══════════════════════════════════════════════════════════════ */
+
+.panel-divider {
+  width: 6px;
+  background: #e2e8f0;
+  cursor: col-resize;
+  transition: background 0.2s ease;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+}
+
+.panel-divider:hover,
+.panel-divider.dragging {
+  background: #3b82f6;
+}
+
+/* Área de agarre más amplia */
+.panel-divider::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  right: -4px;
+}
+
+/* Indicador visual central */
+.panel-divider::after {
+  content: '⋮';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #94a3b8;
+  font-size: 14px;
+  pointer-events: none;
+}
+
+.panel-divider:hover::after,
+.panel-divider.dragging::after {
+  color: #ffffff;
+}
+
+/* Evitar selección de texto mientras se arrastra */
+.main-layout.arrastrando {
+  user-select: none;
+  cursor: col-resize;
 }
 
 /* Botón toggle del editor */
@@ -170,9 +217,12 @@
   padding: 6px 14px;
   font-size: 12px;
   font-weight: 600;
+  border-radius: 20px;
+}
+
+.badge-modo-chat.badge-chatia {
   background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
   color: white;
-  border-radius: 20px;
   box-shadow: 0 2px 8px rgba(139, 92, 246, 0.3);
 }
 
@@ -533,6 +583,13 @@
 
 .menu-input-option .option-texto {
   flex: 1;
+  font-weight: 500;
+}
+
+.menu-input-option .option-desc {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 400;
 }
 
 .menu-input-option.option-reiniciar:hover {
@@ -550,16 +607,10 @@
    RESPONSIVE
    ═══════════════════════════════════════════════════════════════ */
 
-@media (max-width: 1200px) {
-  .chat-panel {
-    flex: 0 0 55%;
-    max-width: 55%;
-    min-width: 300px;
-  }
-
-  .editor-panel {
-    flex: 0 0 45%;
-    min-width: 45%;
+/* Ocultar divisor en pantallas pequeñas */
+@media (max-width: 768px) {
+  .panel-divider {
+    display: none;
   }
 }
 

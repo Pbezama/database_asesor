@@ -19,8 +19,9 @@ const MensajeChat = ({
   mensaje,
   onConfirmar,
   onCancelar,
-  modoChatIA,
+  modoActivo,
   onToggleModo,
+  onCambiarModo,
   onRespuestaRapida,
   onDelegacion,
   nombreMarca = '',
@@ -705,6 +706,43 @@ const MensajeChat = ({
   }
 
   // ═══════════════════════════════════════════════════════════════
+  // RENDERIZAR TABLA SIMPLE (sin controles de descarga/filtros)
+  // ═══════════════════════════════════════════════════════════════
+
+  const renderizarTablaSimple = (tablaData) => {
+    if (!tablaData || !tablaData.columnas || !tablaData.filas) return null
+
+    return (
+      <div className="tabla-container tabla-simple">
+        <div className="tabla-scroll">
+          <table className="tabla-datos">
+            <thead>
+              <tr>
+                {tablaData.columnas.map((col, i) => (
+                  <th key={i}>{col}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {tablaData.filas.map((fila, i) => (
+                <tr key={i}>
+                  {fila.map((celda, j) => (
+                    <td key={j}>
+                      {celda === null || celda === undefined || celda === 'N/A' || celda === ''
+                        ? <span className="celda-vacia">—</span>
+                        : String(celda)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    )
+  }
+
+  // ═══════════════════════════════════════════════════════════════
   // RENDERIZAR CONFIRMACIÓN
   // ═══════════════════════════════════════════════════════════════
 
@@ -783,7 +821,7 @@ const MensajeChat = ({
           <div className="mensaje-exito">
             <span className="exito-icon">✓</span>
             <div className="exito-texto">{contenido}</div>
-            {datos && renderizarTabla(datos)}
+            {datos && renderizarTablaSimple(datos)}
           </div>
         )
 
@@ -842,12 +880,20 @@ const MensajeChat = ({
   // RENDERIZAR SEPARADOR DE CAMBIO DE MODO
   // ═══════════════════════════════════════════════════════════════
 
+  // Obtener icono según modo
+  const obtenerIconoModo = (modo) => {
+    switch (modo) {
+      case 'chatia': return '◆'
+      default: return '◈'
+    }
+  }
+
   const renderizarSeparador = () => {
     return (
       <div className={`mensaje-separador separador-a-${modoOrigen}`}>
         <div className="separador-linea">
           <span className="separador-texto">
-            {modoOrigen === 'chatia' ? '◆' : '◈'} {contenido}
+            {obtenerIconoModo(modoOrigen)} {contenido}
           </span>
         </div>
       </div>
@@ -873,17 +919,26 @@ const MensajeChat = ({
   // RENDERIZAR SUGERENCIA DE DELEGACION
   // ═══════════════════════════════════════════════════════════════
 
+  // Obtener nombre de agente para mostrar
+  const obtenerNombreAgente = (agentId) => {
+    switch (agentId) {
+      case 'chatia': return 'ChatIA'
+      case 'controlador': return 'Controlador'
+      default: return agentId
+    }
+  }
+
   const renderizarSugerenciaDelegacion = () => {
     if (!delegacion?.sugerida) return null
 
     return (
-      <div className="mensaje-sugerencia-delegacion">
+      <div className={`mensaje-sugerencia-delegacion delegacion-a-${delegacion.agenteDestino}`}>
         <p className="delegacion-razon">{delegacion.razon}</p>
         <button
-          className="btn-delegar"
+          className={`btn-delegar btn-delegar-${delegacion.agenteDestino}`}
           onClick={() => onDelegacion && onDelegacion(delegacion)}
         >
-          → Delegar a {delegacion.agenteDestino === 'chatia' ? 'ChatIA' : 'Controlador'}
+          → Delegar a {obtenerNombreAgente(delegacion.agenteDestino)}
         </button>
       </div>
     )
@@ -909,7 +964,7 @@ const MensajeChat = ({
   return (
     <div className={`mensaje ${esUsuario ? 'mensaje-usuario' : 'mensaje-asistente'} ${tipo ? `mensaje-tipo-${tipo}` : ''} ${claseModo}`}>
       <div className="mensaje-avatar">
-        {esUsuario ? '◯' : (modoOrigen === 'chatia' ? '◆' : '◈')}
+        {esUsuario ? '◯' : obtenerIconoModo(modoOrigen)}
       </div>
       <div className="mensaje-contenido">
         {renderizarContenido()}

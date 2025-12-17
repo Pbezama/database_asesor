@@ -176,6 +176,36 @@
   transform: translateY(-1px);
 }
 
+/* Botón delegar a Controlador - Azul */
+.btn-delegar-controlador {
+  background: #3b82f6;
+  color: white;
+}
+
+.btn-delegar-controlador:hover {
+  background: #2563eb;
+}
+
+/* Botón delegar a ChatIA - Violeta */
+.btn-delegar-chatia {
+  background: #8b5cf6;
+  color: white;
+}
+
+.btn-delegar-chatia:hover {
+  background: #7c3aed;
+}
+
+/* Sugerencia delegación */
+.delegacion-a-controlador {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.delegacion-a-controlador .delegacion-razon {
+  color: #1e40af;
+}
+
 /* Responsive para separadores y delegacion */
 @media (max-width: 768px) {
   .mensaje-separador {
@@ -276,6 +306,28 @@
   overflow: hidden;
   border: 1px solid #e2e8f0;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+/* Tabla simple - sin header de acciones */
+.tabla-container.tabla-simple {
+  margin-top: 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+}
+
+.tabla-simple .tabla-datos {
+  font-size: 13px;
+}
+
+.tabla-simple .tabla-datos th {
+  background: #f1f5f9;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
+.tabla-simple .tabla-datos td {
+  padding: 8px 12px;
 }
 
 .tabla-header-acciones {

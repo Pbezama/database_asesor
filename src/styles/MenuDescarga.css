@@ -21,6 +21,9 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
+  pointer-events: auto;
+  position: relative;
+  z-index: 10;
 }
 
 .btn-descarga-principal:hover {
@@ -36,13 +39,13 @@
 /* Menú desplegable */
 .menu-descarga-dropdown {
   position: absolute;
-  top: 100%;
+  bottom: 100%;
   right: 0;
-  margin-top: 4px;
+  margin-bottom: 4px;
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 -10px 40px rgba(0, 0, 0, 0.15);
   z-index: 1000;
   min-width: 200px;
   overflow: hidden;

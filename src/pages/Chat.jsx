@@ -23,7 +23,8 @@ const Chat = () => {
   const [datosMarca, setDatosMarca] = useState([])
   const [accionPendiente, setAccionPendiente] = useState(null)
   const [mostrarEditor, setMostrarEditor] = useState(true)
-  const [modoChatIA, setModoChatIA] = useState(false)
+  // Modo del agente: 'controlador' | 'chatia'
+  const [modoActivo, setModoActivo] = useState('controlador')
   // Estado para navegacion movil: 'chat' | 'editor'
   const [vistaMobile, setVistaMobile] = useState('chat')
   // Estado para el menu desplegable del input
@@ -31,6 +32,13 @@ const Chat = () => {
   // Estados para grabacion de voz
   const [grabandoVoz, setGrabandoVoz] = useState(false)
   const [transcribiendo, setTranscribiendo] = useState(false)
+
+  // Estados para divisor redimensionable
+  const [anchoChat, setAnchoChat] = useState(() => {
+    const guardado = localStorage.getItem('anchoPanelChat')
+    return guardado ? parseFloat(guardado) : 60
+  })
+  const [arrastrando, setArrastrando] = useState(false)
 
   const { usuario, logout, sesionChatId, mensajesCount, incrementarMensajes, reiniciarChat, esSuperAdmin } = useAuth()
   const navigate = useNavigate()
@@ -73,6 +81,42 @@ const Chat = () => {
     }
   }, [menuInputAbierto])
 
+  // Logica de arrastre para el divisor redimensionable
+  const iniciarArrastre = (e) => {
+    e.preventDefault()
+    setArrastrando(true)
+  }
+
+  useEffect(() => {
+    const manejarMovimiento = (e) => {
+      if (!arrastrando) return
+      const contenedor = document.querySelector('.main-layout')
+      if (!contenedor) return
+      const rect = contenedor.getBoundingClientRect()
+      const nuevoAncho = ((e.clientX - rect.left) / rect.width) * 100
+      // Limitar entre 30% y 70%
+      setAnchoChat(Math.min(70, Math.max(30, nuevoAncho)))
+    }
+
+    const finalizarArrastre = () => {
+      if (arrastrando) {
+        setArrastrando(false)
+        // Guardar en localStorage al soltar
+        localStorage.setItem('anchoPanelChat', anchoChat.toString())
+      }
+    }
+
+    if (arrastrando) {
+      document.addEventListener('mousemove', manejarMovimiento)
+      document.addEventListener('mouseup', finalizarArrastre)
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', manejarMovimiento)
+      document.removeEventListener('mouseup', finalizarArrastre)
+    }
+  }, [arrastrando, anchoChat])
+
   const scrollToBottom = () => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
@@ -114,40 +158,64 @@ const Chat = () => {
     setMensajes([mensajeBienvenida])
   }
 
-  const toggleModoChatIA = () => {
-    const modoNuevo = modoChatIA ? 'controlador' : 'chatia'
+  // Función genérica para cambiar entre modos
+  const cambiarModo = (nuevoModo) => {
+    if (nuevoModo === modoActivo) return
 
-    // Agregar separador visual (NO limpiar mensajes)
+    const nombresModo = {
+      controlador: 'Controlador',
+      chatia: 'ChatIA'
+    }
+
+    // Agregar separador visual
     const separador = {
       rol: 'system',
       tipo: 'separador',
-      contenido: `Cambiaste a ${modoNuevo === 'chatia' ? 'ChatIA' : 'Controlador'}`,
+      contenido: `Cambiaste a ${nombresModo[nuevoModo]}`,
       timestamp: new Date().toISOString(),
-      modoOrigen: modoNuevo
+      modoOrigen: nuevoModo
     }
     setMensajes(prev => [...prev, separador])
-    setModoChatIA(!modoChatIA)
+    setModoActivo(nuevoModo)
     setAccionPendiente(null)
+  }
+
+  // Función legacy para compatibilidad
+  const toggleModoChatIA = () => {
+    cambiarModo(modoActivo === 'chatia' ? 'controlador' : 'chatia')
   }
 
   // Nueva funcion para ejecutar delegacion automatica
   const ejecutarDelegacion = async (delegacion) => {
     const { agenteDestino, datosParaDelegar, razon } = delegacion
 
+    const nombresModo = {
+      controlador: 'Controlador',
+      chatia: 'ChatIA'
+    }
+
+    console.log('\n╔══════════════════════════════════════════════════════════════')
+    console.log('║ 🔀 DELEGACIÓN EN PROCESO')
+    console.log('╠══════════════════════════════════════════════════════════════')
+    console.log(`║ 📤 Desde: ${nombresModo[modoActivo]}`)
+    console.log(`║ 📥 Hacia: ${nombresModo[agenteDestino]}`)
+    console.log(`║ 💡 Razón: ${razon}`)
+    console.log(`║ 📦 Datos a transferir: ${datosParaDelegar ? 'Sí' : 'No'}`)
+    console.log('╚══════════════════════════════════════════════════════════════\n')
+
     // Agregar mensaje de delegacion
     const msgDelegacion = {
       rol: 'system',
       tipo: 'delegacion',
-      contenido: `${modoChatIA ? 'ChatIA' : 'Controlador'} delego a ${agenteDestino === 'chatia' ? 'ChatIA' : 'Controlador'}`,
-      desde: modoChatIA ? 'chatia' : 'controlador',
+      contenido: `${nombresModo[modoActivo]} delegó a ${nombresModo[agenteDestino]}`,
+      desde: modoActivo,
       hacia: agenteDestino,
       timestamp: new Date().toISOString()
     }
     setMensajes(prev => [...prev, msgDelegacion])
 
     // Cambiar modo
-    const nuevoModo = agenteDestino === 'chatia'
-    setModoChatIA(nuevoModo)
+    setModoActivo(agenteDestino)
     setAccionPendiente(null)
 
     // Si hay datos para delegar, enviarlos automaticamente al nuevo agente
@@ -163,14 +231,35 @@ const Chat = () => {
   const enviarMensajeConContextoDelegado = async (datos, razon) => {
     setEnviando(true)
 
-    const contextoInicial = `[DELEGACION RECIBIDA]\nRazon: ${razon}\nDatos del agente anterior:\n${JSON.stringify(datos, null, 2)}\n\nPor favor procesa esta informacion segun tus capacidades.`
+    // Formatear datos de manera clara para el agente destino
+    let datosFormateados = ''
+    if (datos) {
+      if (datos.categoria) datosFormateados += `- Categoría: ${datos.categoria}\n`
+      if (datos.clave) datosFormateados += `- Clave: ${datos.clave}\n`
+      if (datos.valor) datosFormateados += `- Valor: ${datos.valor}\n`
+      if (datos.prioridad) datosFormateados += `- Prioridad: ${datos.prioridad}\n`
+      // Si hay otros datos no estructurados
+      if (!datosFormateados && Object.keys(datos).length > 0) {
+        datosFormateados = JSON.stringify(datos, null, 2)
+      }
+    }
 
-    // Agregar como mensaje del sistema (no visible como mensaje de usuario)
+    // Contexto completo para la IA (no visible al usuario)
+    const contextoInicial = `[DELEGACION RECIBIDA]
+Razón: ${razon}
+
+Datos a procesar:
+${datosFormateados || 'Sin datos específicos'}
+
+El usuario ya aprobó esta delegación al hacer click en el botón. Procede a pedir confirmación para agregar estos datos a la base.`
+
+    // Mensaje simplificado para mostrar al usuario
     const mensajeContexto = {
       rol: 'user',
-      contenido: contextoInicial,
+      contenido: 'Acción delegada',
+      contenidoCompleto: contextoInicial, // Guardamos el contexto completo para la IA
       timestamp: new Date().toISOString(),
-      modoOrigen: modoChatIA ? 'chatia' : 'controlador',
+      modoOrigen: modoActivo,
       esDelegacion: true
     }
     setMensajes(prev => [...prev, mensajeContexto])
@@ -179,7 +268,7 @@ const Chat = () => {
     try {
       const historial = mensajes.map(m => ({
         rol: m.rol,
-        contenido: m.contenido,
+        contenido: m.contenidoCompleto || m.contenido, // Usar contenido completo si existe (para delegaciones)
         modoOrigen: m.modoOrigen,
         tipo: m.tipo,
         comentariosCompletos: m.comentariosCompletos,
@@ -188,7 +277,7 @@ const Chat = () => {
       }))
 
       let respuesta
-      if (modoChatIA) {
+      if (modoActivo === 'chatia') {
         respuesta = await chatDirectoIA(contextoInicial, historial)
       } else {
         respuesta = await procesarMensajeIA(contextoInicial, {
@@ -208,8 +297,9 @@ const Chat = () => {
         tipo: respuesta.tipo,
         datos: respuesta.datos,
         delegacion: respuesta.delegacion,
+        sugerencias: respuesta.sugerencias,
         timestamp: new Date().toISOString(),
-        modoOrigen: modoChatIA ? 'chatia' : 'controlador'
+        modoOrigen: modoActivo
       }
       setMensajes(prev => [...prev, mensajeRespuesta])
 
@@ -250,7 +340,7 @@ const Chat = () => {
 
   const handleEnviarMensaje = async (e) => {
     e.preventDefault()
-    
+
     if (!inputMensaje.trim() || enviando) return
 
     // Verificar límite de mensajes
@@ -264,7 +354,31 @@ const Chat = () => {
       return
     }
 
-    const textoMensaje = inputMensaje.trim()
+    let textoMensaje = inputMensaje.trim()
+    const tiempoInicio = performance.now()
+
+    // Detectar cambio de modo por comando o intención
+    const textoLower = textoMensaje.toLowerCase()
+    let modoParaProcesar = modoActivo
+
+    const nombresModo = {
+      controlador: 'Controlador',
+      chatia: 'ChatIA'
+    }
+
+    console.log('\n╔══════════════════════════════════════════════════════════════')
+    console.log('║ 📩 NUEVO MENSAJE DEL USUARIO')
+    console.log('╠══════════════════════════════════════════════════════════════')
+    console.log(`║ 👤 Usuario: ${usuario.nombre}`)
+    console.log(`║ 🏷️  Marca: ${usuario.nombre_marca}`)
+    console.log(`║ 🎯 Modo activo: ${nombresModo[modoParaProcesar]}`)
+    console.log(`║ 💬 Mensaje: "${textoMensaje.substring(0, 100)}${textoMensaje.length > 100 ? '...' : ''}"`)
+    console.log(`║ 📊 Mensajes en sesión: ${mensajesCount + 1}/20`)
+    if (accionPendiente) {
+      console.log(`║ ⏳ Acción pendiente: ${accionPendiente.accion} (ID: ${accionPendiente.parametros?.id_fila || 'nuevo'})`)
+    }
+    console.log('╚══════════════════════════════════════════════════════════════\n')
+
     setInputMensaje('')
     setEnviando(true)
     incrementarMensajes()
@@ -274,7 +388,7 @@ const Chat = () => {
       rol: 'user',
       contenido: textoMensaje,
       timestamp: new Date().toISOString(),
-      modoOrigen: modoChatIA ? 'chatia' : 'controlador'
+      modoOrigen: modoParaProcesar
     }
     setMensajes(prev => [...prev, mensajeUsuario])
 
@@ -290,7 +404,7 @@ const Chat = () => {
     try {
       const historial = mensajes.map(m => ({
         rol: m.rol,
-        contenido: m.contenido,
+        contenido: m.contenidoCompleto || m.contenido, // Usar contenido completo si existe (para delegaciones)
         modoOrigen: m.modoOrigen,
         tipo: m.tipo,
         comentariosCompletos: m.comentariosCompletos,
@@ -298,10 +412,13 @@ const Chat = () => {
         tabla_preview: m.tabla_preview
       }))
 
+      console.log(`🔄 Chat.jsx: Enviando a ${nombresModo[modoParaProcesar]}...`)
+      console.log(`📜 Chat.jsx: Historial con ${historial.length} mensajes`)
+
       let respuesta
 
       // Usar función según el modo activo
-      if (modoChatIA) {
+      if (modoParaProcesar === 'chatia') {
         // Modo ChatIA: chat directo sin funciones de base de datos
         respuesta = await chatDirectoIA(textoMensaje, historial)
       } else {
@@ -317,18 +434,35 @@ const Chat = () => {
         })
       }
 
-      console.log('📥 Respuesta de IA:', respuesta)
-      console.log('📋 Acción pendiente actual:', accionPendiente)
+      const tiempoFin = performance.now()
+      console.log('\n╔══════════════════════════════════════════════════════════════')
+      console.log('║ 📤 RESPUESTA RECIBIDA')
+      console.log('╠══════════════════════════════════════════════════════════════')
+      console.log(`║ ⏱️  Tiempo: ${(tiempoFin - tiempoInicio).toFixed(0)}ms`)
+      console.log(`║ 📋 Tipo: ${respuesta.tipo}`)
+      console.log(`║ 💬 Contenido: "${(respuesta.contenido || '').substring(0, 80)}${(respuesta.contenido || '').length > 80 ? '...' : ''}"`)
+      if (respuesta.delegacion?.sugerida) {
+        console.log(`║ 🔀 Delegación sugerida: → ${respuesta.delegacion.agenteDestino}`)
+      }
+      if (respuesta.accionPendiente) {
+        console.log(`║ ⏳ Nueva acción pendiente: ${respuesta.accionPendiente.accion}`)
+      }
+      if (respuesta.ejecutar) {
+        console.log(`║ ▶️  Acción a ejecutar: ${respuesta.ejecutar.accion}`)
+      }
+      console.log('╚══════════════════════════════════════════════════════════════\n')
 
-      // En modo ChatIA, mostramos la respuesta con posible delegacion
-      if (modoChatIA) {
+      // En modo ChatIA, mostramos la respuesta con posible delegacion/sugerencias
+      if (modoParaProcesar === 'chatia') {
         const mensajeRespuesta = {
           rol: 'assistant',
           contenido: respuesta.contenido,
           tipo: respuesta.tipo,
           timestamp: new Date().toISOString(),
-          modoOrigen: 'chatia',
-          delegacion: respuesta.delegacion || null
+          modoOrigen: modoParaProcesar,
+          delegacion: respuesta.delegacion || null,
+          sugerencias: respuesta.sugerencias || null,
+          puntosClave: respuesta.puntosClave || null
         }
         setMensajes(prev => [...prev, mensajeRespuesta])
 
@@ -496,15 +630,26 @@ const Chat = () => {
 
   const ejecutarAccion = async (ejecutar) => {
     const { accion, parametros } = ejecutar
-    console.log('🎬 Ejecutando acción:', accion)
-    console.log('📝 Parámetros:', JSON.stringify(parametros, null, 2))
+    const tiempoInicio = performance.now()
+
+    console.log('\n╔══════════════════════════════════════════════════════════════')
+    console.log('║ ⚡ EJECUTANDO ACCIÓN EN BASE DE DATOS')
+    console.log('╠══════════════════════════════════════════════════════════════')
+    console.log(`║ 🎯 Acción: ${accion.toUpperCase()}`)
+    console.log(`║ 📍 ID registro: ${parametros.id_fila || 'NUEVO'}`)
+    console.log(`║ 📁 Categoría: ${parametros.categoria || '—'}`)
+    console.log(`║ 🔑 Clave: ${parametros.clave || '—'}`)
+    if (parametros.updates) {
+      console.log(`║ 📝 Campos a modificar: ${Object.keys(parametros.updates).filter(k => parametros.updates[k] !== null).join(', ')}`)
+    }
+    console.log('╚══════════════════════════════════════════════════════════════\n')
 
     let resultado
 
     try {
       switch (accion) {
         case 'agregar':
-          console.log('➕ Agregando nuevo registro...')
+          console.log('   ➕ Supabase: Insertando nuevo registro...')
           resultado = await agregarDato({
             'ID marca': usuario.id_marca,
             'Nombre marca': usuario.nombre_marca,
@@ -518,26 +663,21 @@ const Chat = () => {
           break
 
         case 'modificar':
-          console.log('✏️ Modificando registro ID:', parametros.id_fila)
-          console.log('📋 Updates a aplicar:', parametros.updates)
-          
+          console.log('   ✏️  Supabase: Modificando registro...')
           if (!parametros.id_fila) {
             throw new Error('No se especificó el ID del registro a modificar')
           }
           if (!parametros.updates || Object.keys(parametros.updates).length === 0) {
             throw new Error('No se especificaron los cambios a realizar')
           }
-          
           resultado = await modificarDato(parametros.id_fila, parametros.updates)
           break
 
         case 'desactivar':
-          console.log('🛑 Desactivando registro ID:', parametros.id_fila)
-          
+          console.log('   🛑 Supabase: Desactivando registro...')
           if (!parametros.id_fila) {
             throw new Error('No se especificó el ID del registro a desactivar')
           }
-          
           resultado = await desactivarDato(parametros.id_fila)
           break
 
@@ -545,7 +685,19 @@ const Chat = () => {
           resultado = { success: false, error: `Acción no reconocida: ${accion}` }
       }
 
-      console.log('📊 Resultado de la acción:', resultado)
+      const tiempoFin = performance.now()
+      console.log('\n╔══════════════════════════════════════════════════════════════')
+      console.log(`║ ${resultado.success ? '✅ ACCIÓN COMPLETADA' : '❌ ACCIÓN FALLIDA'}`)
+      console.log('╠══════════════════════════════════════════════════════════════')
+      console.log(`║ ⏱️  Tiempo: ${(tiempoFin - tiempoInicio).toFixed(0)}ms`)
+      if (resultado.success) {
+        console.log(`║ 🆔 ID resultado: ${resultado.data?.id}`)
+        console.log(`║ 📁 Categoría: ${resultado.data?.categoria}`)
+        console.log(`║ 🔑 Clave: ${resultado.data?.clave}`)
+      } else {
+        console.log(`║ ❌ Error: ${resultado.error}`)
+      }
+      console.log('╚══════════════════════════════════════════════════════════════\n')
 
       // Log de acción
       await guardarLogAccion({
@@ -775,18 +927,16 @@ const Chat = () => {
             <span className="user-name">{usuario.nombre}</span>
             {esSuperAdmin && <span className="badge-admin">Super Admin</span>}
           </div>
-          {modoChatIA && (
-            <span className="badge-modo-chat">◆ Modo ChatIA</span>
+          {modoActivo === 'chatia' && (
+            <span className="badge-modo-chat badge-chatia">◆ Modo ChatIA</span>
           )}
-          {!modoChatIA && (
-            <button
-              onClick={() => setMostrarEditor(!mostrarEditor)}
-              className={`btn-icon btn-toggle-editor desktop-only ${mostrarEditor ? 'active' : ''}`}
-              title={mostrarEditor ? 'Ocultar editor' : 'Mostrar editor'}
-            >
-              ≡
-            </button>
-          )}
+          <button
+            onClick={() => setMostrarEditor(!mostrarEditor)}
+            className={`btn-icon btn-toggle-editor desktop-only ${mostrarEditor ? 'active' : ''}`}
+            title={mostrarEditor ? 'Ocultar editor' : 'Mostrar editor'}
+          >
+            ≡
+          </button>
           <button onClick={handleReiniciarChat} className="btn-icon" title="Reiniciar chat">
             ↻
           </button>
@@ -797,11 +947,14 @@ const Chat = () => {
       </header>
 
       {/* Layout principal dividido */}
-      <div className="main-layout">
+      <div className={`main-layout ${arrastrando ? 'arrastrando' : ''}`}>
         {/* Panel izquierdo: Chat */}
-        <div className={`chat-panel ${!mostrarEditor ? 'full-width' : ''} mobile-panel ${vistaMobile === 'chat' || vistaMobile === 'chatia' ? 'mobile-visible' : 'mobile-hidden'}`}>
+        <div
+          className={`chat-panel ${!mostrarEditor ? 'full-width' : ''} mobile-panel ${vistaMobile === 'chat' || vistaMobile === 'chatia' ? 'mobile-visible' : 'mobile-hidden'}`}
+          style={mostrarEditor ? { flex: `0 0 ${anchoChat}%`, maxWidth: `${anchoChat}%` } : undefined}
+        >
           {/* Indicador de accion pendiente (solo en modo controlador) */}
-          {!modoChatIA && accionPendiente && (
+          {modoActivo === 'controlador' && accionPendiente && (
             <div className="accion-pendiente-indicator">
               <span>●</span>
               <span>Accion pendiente: <strong>{accionPendiente.accion}</strong></span>
@@ -819,8 +972,9 @@ const Chat = () => {
               <MensajeChat
                 key={index}
                 mensaje={mensaje}
-                modoChatIA={modoChatIA}
+                modoActivo={modoActivo}
                 onToggleModo={toggleModoChatIA}
+                onCambiarModo={cambiarModo}
                 onRespuestaRapida={handleRespuestaRapida}
                 onDelegacion={ejecutarDelegacion}
                 nombreMarca={usuario.nombre_marca}
@@ -848,33 +1002,49 @@ const Chat = () => {
               {20 - mensajesCount} mensajes restantes
             </div>
             <form onSubmit={handleEnviarMensaje} className="chat-input-form">
-              {/* Menu desplegable de opciones */}
+              {/* Menu desplegable de opciones - 3 modos */}
               <div className="menu-input-wrapper" ref={menuInputRef}>
                 <button
                   type="button"
-                  className={`btn-menu-input ${modoChatIA ? 'modo-chatia' : 'modo-controlador'}`}
+                  className={`btn-menu-input modo-${modoActivo}`}
                   onClick={() => setMenuInputAbierto(!menuInputAbierto)}
                   aria-expanded={menuInputAbierto}
                   aria-haspopup="true"
                 >
-                  <span className="menu-input-icon">{modoChatIA ? '◆' : '◈'}</span>
-                  <span className="menu-input-texto">{modoChatIA ? 'ChatIA' : 'Controlador'}</span>
+                  <span className="menu-input-icon">
+                    {modoActivo === 'controlador' ? '◈' : '◆'}
+                  </span>
+                  <span className="menu-input-texto">
+                    {modoActivo === 'controlador' ? 'Controlador' : 'ChatIA'}
+                  </span>
                   <span className="menu-input-arrow">{menuInputAbierto ? '▴' : '▾'}</span>
                 </button>
 
-                {/* Dropdown del menu */}
+                {/* Dropdown del menu con 2 modos */}
                 {menuInputAbierto && (
                   <div className="menu-input-dropdown">
-                    <button
-                      type="button"
-                      className="menu-input-option"
-                      onClick={() => handleMenuInputAction('toggle-modo')}
-                    >
-                      <span className="option-icon">{modoChatIA ? '◈' : '◆'}</span>
-                      <span className="option-texto">
-                        {modoChatIA ? 'Cambiar a Controlador' : 'Cambiar a ChatIA'}
-                      </span>
-                    </button>
+                    {modoActivo !== 'controlador' && (
+                      <button
+                        type="button"
+                        className="menu-input-option"
+                        onClick={() => { cambiarModo('controlador'); setMenuInputAbierto(false) }}
+                      >
+                        <span className="option-icon">◈</span>
+                        <span className="option-texto">Controlador</span>
+                        <span className="option-desc">Gestionar datos</span>
+                      </button>
+                    )}
+                    {modoActivo !== 'chatia' && (
+                      <button
+                        type="button"
+                        className="menu-input-option"
+                        onClick={() => { cambiarModo('chatia'); setMenuInputAbierto(false) }}
+                      >
+                        <span className="option-icon">◆</span>
+                        <span className="option-texto">ChatIA</span>
+                        <span className="option-desc">Chat general</span>
+                      </button>
+                    )}
                     <div className="menu-input-divider"></div>
                     <button
                       type="button"
@@ -893,7 +1063,9 @@ const Chat = () => {
                 value={inputMensaje}
                 onChange={(e) => setInputMensaje(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={modoChatIA ? "Pregunta lo que quieras..." : "Escribe tu mensaje..."}
+                placeholder={
+                  modoActivo === 'controlador' ? "Escribe tu mensaje..." : "Pregunta lo que quieras..."
+                }
                 disabled={enviando || mensajesCount >= 20 || grabandoVoz}
                 rows={1}
               />
@@ -917,20 +1089,20 @@ const Chat = () => {
           </footer>
         </div>
 
-        {/* Panel derecho: Editor Manual (solo en modo controlador) */}
-        {!modoChatIA && mostrarEditor && (
-          <div className={`editor-panel mobile-panel ${vistaMobile === 'editor' ? 'mobile-visible' : 'mobile-hidden'}`}>
-            <EditorManual
-              usuario={usuario}
-              esSuperAdmin={esSuperAdmin}
-              onDatosActualizados={cargarDatosMarca}
-            />
-          </div>
+        {/* Divisor redimensionable (solo desktop, con editor visible) */}
+        {mostrarEditor && (
+          <div
+            className={`panel-divider ${arrastrando ? 'dragging' : ''}`}
+            onMouseDown={iniciarArrastre}
+          />
         )}
 
-        {/* Editor para movil cuando esta en vista editor pero modoChatIA esta activo */}
-        {vistaMobile === 'editor' && modoChatIA && (
-          <div className="editor-panel mobile-panel mobile-visible mobile-only">
+        {/* Panel derecho: Editor Manual (visible en todos los modos si está habilitado) */}
+        {mostrarEditor && (
+          <div
+            className={`editor-panel mobile-panel ${vistaMobile === 'editor' ? 'mobile-visible' : 'mobile-hidden'}`}
+            style={{ flex: `0 0 ${100 - anchoChat}%`, minWidth: `${100 - anchoChat}%` }}
+          >
             <EditorManual
               usuario={usuario}
               esSuperAdmin={esSuperAdmin}
@@ -946,7 +1118,9 @@ const Chat = () => {
           className={`mobile-nav-btn ${vistaMobile === 'chat' ? 'active' : ''}`}
           onClick={() => cambiarVistaMobile('chat')}
         >
-          <span className="mobile-nav-icon">{modoChatIA ? '◆' : '◈'}</span>
+          <span className="mobile-nav-icon">
+            {modoActivo === 'controlador' ? '◈' : '◆'}
+          </span>
           <span className="mobile-nav-label">Chat</span>
         </button>
         <button
