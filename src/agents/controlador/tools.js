@@ -308,19 +308,19 @@ export const tools = [
     type: 'function',
     function: {
       name: 'sugerir_delegacion',
-      description: 'Sugerir que ChatIA maneje tareas creativas: idear promociones, brainstorming, redacción, lluvia de ideas.',
+      description: 'Sugerir derivar a otro agente. Usar para: ChatIA (tareas creativas), Meta Ads (ver campanas, publicidad, anuncios).',
       strict: true,
       parameters: {
         type: 'object',
         properties: {
           mensaje: {
             type: 'string',
-            description: 'Mensaje explicando por qué se sugiere delegar y qué puede hacer ChatIA'
+            description: 'Mensaje explicando por qué se sugiere delegar'
           },
           agente_destino: {
             type: 'string',
-            enum: ['chatia'],
-            description: 'Agente destino de la delegación'
+            enum: ['chatia', 'meta-ads'],
+            description: 'Agente destino: chatia para creatividad, meta-ads para campanas publicitarias'
           },
           razon: {
             type: 'string',

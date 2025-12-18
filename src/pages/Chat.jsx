@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { useView } from '../context/ViewContext'
 import {
   obtenerDatosMarca,
   obtenerTodasLasMarcas,
@@ -14,6 +15,7 @@ import {
 import { procesarMensajeIA, chatDirectoIA, transcribirAudio } from '../services/openai'
 import MensajeChat from '../components/MensajeChat'
 import EditorManual from '../components/EditorManual'
+import MetaAdsView from '../views/MetaAdsView'
 import '../styles/Chat.css'
 
 const Chat = () => {
@@ -41,6 +43,7 @@ const Chat = () => {
   const [arrastrando, setArrastrando] = useState(false)
 
   const { usuario, logout, sesionChatId, mensajesCount, incrementarMensajes, reiniciarChat, esSuperAdmin } = useAuth()
+  const { vistaActiva, navegarA, contextoVista } = useView()
   const navigate = useNavigate()
   const chatEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -480,6 +483,30 @@ El usuario ya aprobó esta delegación al hacer click en el botón. Procede a pe
       }
 
       // ═══════════════════════════════════════════════════════════════
+      // MANEJO DE NAVEGACION A VISTAS DE AGENTES
+      // ═══════════════════════════════════════════════════════════════
+
+      if (respuesta.tipo === 'navegacion') {
+        console.log('🧭 Navegando a vista:', respuesta.destino, 'con contexto:', respuesta.contexto)
+
+        // Agregar mensaje al chat antes de navegar
+        const mensajeNavegacion = {
+          rol: 'assistant',
+          contenido: respuesta.contenido,
+          tipo: 'texto',
+          timestamp: new Date().toISOString(),
+          modoOrigen: modoParaProcesar
+        }
+        setMensajes(prev => [...prev, mensajeNavegacion])
+
+        // Navegar a la vista
+        navegarA(respuesta.destino, respuesta.contexto)
+
+        setEnviando(false)
+        return
+      }
+
+      // ═══════════════════════════════════════════════════════════════
       // MANEJO DE CONSULTA DE COMENTARIOS
       // ═══════════════════════════════════════════════════════════════
 
@@ -908,7 +935,16 @@ El usuario ya aprobó esta delegación al hacer click en el botón. Procede a pe
   if (!usuario) return null
 
   // ═══════════════════════════════════════════════════════════════
-  // RENDER
+  // RENDER - VISTA DE AGENTE ESPECIALIZADO
+  // ═══════════════════════════════════════════════════════════════
+
+  // Si estamos en una vista de agente, mostrarla
+  if (vistaActiva === 'meta-ads') {
+    return <MetaAdsView contexto={contextoVista} />
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // RENDER - CHAT PRINCIPAL
   // ═══════════════════════════════════════════════════════════════
 
   return (
@@ -977,6 +1013,7 @@ El usuario ya aprobó esta delegación al hacer click en el botón. Procede a pe
                 onCambiarModo={cambiarModo}
                 onRespuestaRapida={handleRespuestaRapida}
                 onDelegacion={ejecutarDelegacion}
+                onNavegar={navegarA}
                 nombreMarca={usuario.nombre_marca}
                 usuario={usuario}
               />
@@ -1045,6 +1082,16 @@ El usuario ya aprobó esta delegación al hacer click en el botón. Procede a pe
                         <span className="option-desc">Chat general</span>
                       </button>
                     )}
+                    <div className="menu-input-divider"></div>
+                    <button
+                      type="button"
+                      className="menu-input-option option-meta-ads"
+                      onClick={() => { navegarA('meta-ads'); setMenuInputAbierto(false) }}
+                    >
+                      <span className="option-icon">◇</span>
+                      <span className="option-texto">Meta Ads</span>
+                      <span className="option-desc">Ver campanas</span>
+                    </button>
                     <div className="menu-input-divider"></div>
                     <button
                       type="button"

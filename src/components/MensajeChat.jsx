@@ -24,6 +24,7 @@ const MensajeChat = ({
   onCambiarModo,
   onRespuestaRapida,
   onDelegacion,
+  onNavegar,
   nombreMarca = '',
   usuario = null
 }) => {
@@ -283,15 +284,22 @@ const MensajeChat = ({
         c.toLowerCase().includes('respuesta')
       )
 
+      // Obtener id del usuario (UUID de Supabase) para control de límites
+      const idEmpresa = usuario?.id || null
+      const nombreUsuario = usuario?.nombre || usuario?.usuario || null
+
       let resultado
       if (esComentarios) {
-        resultado = await analizarComentarios(datosParaAnalizar, nombreMarca)
+        resultado = await analizarComentarios(datosParaAnalizar, nombreMarca, idEmpresa, nombreUsuario)
       } else {
-        resultado = await analizarDatosMarca(datosParaAnalizar, nombreMarca)
+        resultado = await analizarDatosMarca(datosParaAnalizar, nombreMarca, idEmpresa, nombreUsuario)
       }
 
       if (resultado.success) {
         setResultadoAnalisis({ ...resultado, tipo: esComentarios ? 'comentarios' : 'marca' })
+      } else if (resultado.limiteExcedido) {
+        // Manejar límite de informes excedido
+        setErrorAnalisis(resultado.mensaje)
       } else {
         setErrorAnalisis(resultado.error)
       }
@@ -924,12 +932,28 @@ const MensajeChat = ({
     switch (agentId) {
       case 'chatia': return 'ChatIA'
       case 'controlador': return 'Controlador'
+      case 'meta-ads': return 'Meta Ads'
       default: return agentId
     }
   }
 
   const renderizarSugerenciaDelegacion = () => {
     if (!delegacion?.sugerida) return null
+
+    // Caso especial: Meta Ads usa navegación en lugar de delegación de chat
+    if (delegacion.agenteDestino === 'meta-ads') {
+      return (
+        <div className="mensaje-sugerencia-delegacion delegacion-a-meta-ads">
+          <p className="delegacion-razon">{delegacion.razon}</p>
+          <button
+            className="btn-delegar btn-delegar-meta-ads btn-navegar-meta"
+            onClick={() => onNavegar && onNavegar('meta-ads', delegacion.datosParaDelegar)}
+          >
+            ◇ Vamos a Meta Ads
+          </button>
+        </div>
+      )
+    }
 
     return (
       <div className={`mensaje-sugerencia-delegacion delegacion-a-${delegacion.agenteDestino}`}>

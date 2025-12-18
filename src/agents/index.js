@@ -8,12 +8,14 @@
 import controlador from './controlador'
 import chatia from './chatia'
 import analista from './analista'
+import metaAds from './meta-ads'
 
 // Registro de todos los agentes disponibles
 export const agents = {
   controlador,
   chatia,
-  analista
+  analista,
+  'meta-ads': metaAds
 }
 
 /**

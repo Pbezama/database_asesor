@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { ViewProvider } from './context/ViewContext'
 import Login from './pages/Login'
 import Chat from './pages/Chat'
 import './App.css'
@@ -71,9 +72,11 @@ function AppRoutes() {
 function App() {
   return (
     <AuthProvider>
-      <Router>
-        <AppRoutes />
-      </Router>
+      <ViewProvider>
+        <Router>
+          <AppRoutes />
+        </Router>
+      </ViewProvider>
     </AuthProvider>
   )
 }

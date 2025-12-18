@@ -206,6 +206,34 @@
   color: #1e40af;
 }
 
+/* Sugerencia delegación a Meta Ads - Azul Meta */
+.delegacion-a-meta-ads {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+
+.delegacion-a-meta-ads .delegacion-razon {
+  color: #1e40af;
+}
+
+/* Botón navegar a Meta Ads */
+.btn-delegar-meta-ads {
+  background: linear-gradient(135deg, #1877F2 0%, #0d65d9 100%);
+  color: white;
+  box-shadow: 0 2px 8px rgba(24, 119, 242, 0.3);
+}
+
+.btn-delegar-meta-ads:hover {
+  background: linear-gradient(135deg, #0d65d9 0%, #0052cc 100%);
+  box-shadow: 0 4px 12px rgba(24, 119, 242, 0.4);
+}
+
+.btn-navegar-meta {
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
 /* Responsive para separadores y delegacion */
 @media (max-width: 768px) {
   .mensaje-separador {

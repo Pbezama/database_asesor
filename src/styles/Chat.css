@@ -598,6 +598,19 @@
   color: #dc2626;
 }
 
+.menu-input-option.option-meta-ads {
+  color: #1877F2;
+}
+
+.menu-input-option.option-meta-ads:hover {
+  background: #eff6ff;
+  color: #1565c0;
+}
+
+.menu-input-option.option-meta-ads .option-icon {
+  color: #1877F2;
+}
+
 .menu-input-divider {
   height: 1px;
   background: #e2e8f0;
