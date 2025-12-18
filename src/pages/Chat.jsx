@@ -1083,7 +1083,7 @@ El usuario ya aprobó esta delegación al hacer click en el botón. Procede a pe
                 disabled={enviando || !inputMensaje.trim() || mensajesCount >= 20}
                 className="btn-enviar"
               >
-                {enviando ? '...' : '→'}
+                {enviando ? '...' : '↑'}
               </button>
             </form>
           </footer>
